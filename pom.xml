@@ -161,6 +161,12 @@
 							<version>${com.querydsl.version}</version>
 							<classifier>jakarta</classifier>
 						</path>
+
+						<!-- Jakarta Persistence API для QueryDSL APT -->
+						<path>
+							<groupId>jakarta.persistence</groupId>
+							<artifactId>jakarta.persistence-api</artifactId>
+						</path>
 					</annotationProcessorPaths>
 				</configuration>
 			</plugin>
