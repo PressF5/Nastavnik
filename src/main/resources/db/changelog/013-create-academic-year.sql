@@ -6,8 +6,8 @@ CREATE TABLE academic_year (
     start_date  DATE NOT NULL,
     end_date    DATE NOT NULL,
     active      BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at        TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at        TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT  uk_academic_year_name UNIQUE (name),
     CONSTRAINT  chk_academic_year_dates CHECK (start_date < end_date)

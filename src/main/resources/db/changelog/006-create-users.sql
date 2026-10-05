@@ -20,6 +20,26 @@ CREATE TABLE users (
     CONSTRAINT          uk_users_id_msu UNIQUE (id, msu_id),
     CONSTRAINT          uk_users_email UNIQUE (email),
     CONSTRAINT          chk_users_email_length CHECK (length(email) <= 250),
+    CONSTRAINT          chk_users_role_scope
+        CHECK (
+            (
+                role_id = 1
+                AND msu_id IS NULL
+                AND educational_org_id IS NULL
+            )
+            OR
+            (
+                role_id = 2
+                AND msu_id IS NOT NULL
+                AND educational_org_id IS NULL
+            )
+            OR
+            (
+                role_id IN (3, 4, 5)
+                AND msu_id IS NOT NULL
+                AND educational_org_id IS NOT NULL
+            )
+        ),
     CONSTRAINT          fk_users_region FOREIGN KEY (region_id) REFERENCES region (id),
     CONSTRAINT          fk_users_msu_region FOREIGN KEY (msu_id, region_id) REFERENCES msu (id, region_id),
     CONSTRAINT          fk_users_oo_msu FOREIGN KEY (educational_org_id, msu_id) REFERENCES educational_organization (id, msu_id),

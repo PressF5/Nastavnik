@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.donriro.nastavnik.user.role.RoleCode;
 
 @Entity
 @Table(name = "role")
@@ -16,8 +17,9 @@ public class Role {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Short id;
 
-    @Column(name = "code", nullable = false, length = 50)
-    private String code;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 50)
+    private RoleCode code;
 
     @Column(name = "name", nullable = false, length = 100)
     private String name;

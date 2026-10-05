@@ -1,9 +1,9 @@
 --liquibase formatted sql
 --changeset nastavnik:005-1-insert-roles
-INSERT INTO role (code, name)
+INSERT INTO role (id, code, name)
 VALUES
-    ('REGION_ADMIN', 'Администратор региона'),
-    ('MSU_ADMIN', 'Администратор МСУ'),
-    ('OO_ADMIN', 'Администратор ОО'),
-    ('MENTOR', 'Наставник'),
-    ('MENTEE', 'Наставляемый');
+    (1, 'REGION_ADMIN', 'Администратор региона'),
+    (2, 'MSU_ADMIN', 'Администратор МСУ'),
+    (3, 'OO_ADMIN', 'Администратор ОО'),
+    (4, 'MENTOR', 'Наставник'),
+    (5, 'MENTEE', 'Наставляемый');
