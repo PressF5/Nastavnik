@@ -1,0 +1,58 @@
+databaseChangeLog:
+
+  - include:
+      file: db/changelog/001-extension-citext.sql
+
+  - include:
+      file: db/changelog/002-create-region.sql
+
+  - include:
+      file: db/changelog/003-create-msu.sql
+
+  - include:
+      file: db/changelog/004-create-educational-organization.sql
+
+  - include:
+      file: db/changelog/005-create-role.sql
+
+  - include:
+      file: db/changelog/005-1-insert-roles.sql
+
+  - include:
+      file: db/changelog/006-create-users.sql
+
+  - include:
+      file: db/changelog/007-create-user-audit-log.sql
+
+  - include:
+      file: db/changelog/008-create-profile-field.sql
+
+  - include:
+      file: db/changelog/009-create-profile-field-role.sql
+
+  - include:
+      file: db/changelog/010-create-profile-field-option.sql
+
+  - include:
+      file: db/changelog/011-create-profile-value.sql
+
+  - include:
+      file: db/changelog/012-create-profile-value-option.sql
+
+  - include:
+      file: db/changelog/013-create-academic-year.sql
+
+  - include:
+      file: db/changelog/014-create-mentor-participation.sql
+
+  - include:
+      file: db/changelog/015-create-mentorship.sql
+
+  - include:
+      file: db/changelog/016-create-mentorship-audit-log.sql
+
+  - include:
+      file: db/changelog/017-create-indexes.sql
+
+  - include:
+      file: db/changelog/018-create-unique-partial-indexes.sql
