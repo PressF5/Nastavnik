@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.donriro.nastavnik.profile.field.entity.ProfileField;
 import org.donriro.nastavnik.profile.field.entity.ProfileFieldOption;
 
 @Entity
@@ -25,4 +26,8 @@ public class ProfileValueOption {
     @MapsId("profileOptionId")
     @JoinColumn(name = "profile_option_id", nullable = false)
     private ProfileFieldOption profileOption;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "profile_field_id", nullable = false)
+    private ProfileField profileField;
 }

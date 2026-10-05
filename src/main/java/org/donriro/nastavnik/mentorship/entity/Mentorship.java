@@ -9,7 +9,7 @@ import org.donriro.nastavnik.mentorship.status.MentorshipStatus;
 import org.donriro.nastavnik.organization.msu.entity.Msu;
 import org.donriro.nastavnik.user.entity.User;
 
-import java.time.OffsetDateTime;
+import java.time.Instant;
 
 @Entity
 @Table(name = "mentorship")
@@ -47,8 +47,8 @@ public class Mentorship extends BaseEntity {
     private Msu msu;
 
     @Column(name = "started_at")
-    private OffsetDateTime startedAt;
+    private Instant startedAt;
 
     @Column(name = "ended_at")
-    private OffsetDateTime endedAt;
+    private Instant endedAt;
 }

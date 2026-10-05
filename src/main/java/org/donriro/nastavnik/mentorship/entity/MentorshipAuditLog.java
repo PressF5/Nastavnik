@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.donriro.nastavnik.config.common.persistence.AuditLogBaseEntity;
 import org.donriro.nastavnik.mentorship.status.MentorshipStatus;
 import org.donriro.nastavnik.user.entity.User;
 import org.donriro.nastavnik.user.status.AuditSource;
@@ -13,7 +14,7 @@ import org.donriro.nastavnik.user.status.AuditSource;
 @Getter
 @Setter
 @NoArgsConstructor
-public class MentorshipAuditLog {
+public class MentorshipAuditLog extends AuditLogBaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
