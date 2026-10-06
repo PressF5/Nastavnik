@@ -20,6 +20,8 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.Period;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 
 @Service
 @RequiredArgsConstructor
@@ -33,12 +35,12 @@ public class RegistrationService {
     private final MsuRepository msuRepository;
     private final EducationalOrganizationRepository educationalOrganizationRepository;
     // private final PasswordEncoder passwordEncoder;
+    LocalDate today = LocalDate.now(ZoneOffset.UTC);
 
     public User register(RegistrationRequest request) {
         validateCommonFields(request);
 
         RoleCode roleCode = request.role();
-
         validateRole(roleCode);
 
         String normalizedEmail = normalizeEmail(request.email());
@@ -52,8 +54,7 @@ public class RegistrationService {
             case OO_ADMIN -> registerOoAdmin(request, normalizedEmail, role);
             case MENTOR -> registerMentor(request, normalizedEmail, role);
             case MENTEE -> registerMentee(request, normalizedEmail, role);
-            case REGION_ADMIN ->
-                    throw new InvalidRegistrationRoleException("Регистрация REGION_ADMIN через обычную регистрацию запрещена.");
+            case REGION_ADMIN -> throw new InvalidRegistrationRoleException("Регистрация REGION_ADMIN через обычную регистрацию запрещена.");
         };
     }
 
@@ -137,8 +138,7 @@ public class RegistrationService {
             throw new InvalidRegistrationRequestException("Данные регистрации не могут быть null.");
         }
 
-        // Изменить LocalDate.now() на что-то другое
-        if (request.birthDate() != null && request.birthDate().isAfter(LocalDate.now())) {
+        if (request.birthDate() != null && request.birthDate().isAfter(today)) {
             throw new InvalidRegistrationRequestException("Дата рождения не может быть в будущем.");
         }
     }
@@ -219,7 +219,6 @@ public class RegistrationService {
         if (birthDate == null) {
             throw new InvalidRegistrationRequestException("Дата рождения наставляемого обязательна.");
         }
-        LocalDate today = LocalDate.now();
         int age = Period.between(birthDate, today).getYears();
         if (age > MAX_MENTEE_AGE) {
             throw new InvalidMenteeAgeException("Возраст наставляемого не может превышать " + MAX_MENTEE_AGE + " лет.");
