@@ -41,13 +41,10 @@ public class RegistrationService {
         validateCommonFields(request);
 
         RoleCode roleCode = request.role();
-        validateRole(roleCode);
+        Role role = getRole(roleCode);
 
         String normalizedEmail = normalizeEmail(request.email());
-
         checkEmailUniqueness(normalizedEmail);
-
-        Role role = getRole(roleCode);
 
         return switch (roleCode) {
             case MSU_ADMIN -> registerMsuAdmin(request, normalizedEmail, role);
@@ -64,6 +61,7 @@ public class RegistrationService {
         checkMsuAdminUniqueness(msu);
 
         User user = buildUser(request, email, role, msu.getRegion(), msu, null);
+
         return userRepository.save(user);
     }
 
@@ -89,6 +87,7 @@ public class RegistrationService {
         Region region = msu.getRegion();
 
         User user = buildUser(request, email, role, region, msu, educationalOrganization);
+
         return userRepository.save(user);
     }
 
@@ -123,10 +122,6 @@ public class RegistrationService {
         user.setMsu(msu);
         user.setEducationalOrganization(educationalOrganization);
         user.setRole(role);
-
-        /*
-         * Обычная регистрация всегда начинается со статуса PENDING. REGION_ADMIN создаётся отдельно через bootstrap и сразу получает ACCEPTED.
-         */
         user.setAccountStatus(AccountStatus.PENDING);
         user.setBlocked(false);
 
@@ -140,16 +135,6 @@ public class RegistrationService {
 
         if (request.birthDate() != null && request.birthDate().isAfter(today)) {
             throw new InvalidRegistrationRequestException("Дата рождения не может быть в будущем.");
-        }
-    }
-
-    private void validateRole(RoleCode roleCode) {
-        if (roleCode == null) {
-            throw new InvalidRegistrationRoleException("Роль пользователя не указана.");
-        }
-
-        if (roleCode == RoleCode.REGION_ADMIN) {
-            throw new InvalidRegistrationRoleException("REGION_ADMIN создаётся только через bootstrap.");
         }
     }
 
@@ -205,10 +190,7 @@ public class RegistrationService {
         EducationalOrganization educationalOrganization = educationalOrganizationRepository
                         .findById(educationalOrganizationId)
                         .orElseThrow(() -> new EducationalOrganizationNotFoundException("Образовательная организация не найдена: " + educationalOrganizationId));
-        /*
-         * В запросе frontend передаёт и msuId, и educationalOrganizationId.
-         * Здесь обязательно проверяем, что выбранная ОО действительно принадлежит выбранному МСУ.
-         */
+
         if (!educationalOrganization.getMsu().getId().equals(msuId)) {
             throw new InvalidRegistrationScopeException("Образовательная организация не принадлежит указанному МСУ.");
         }
@@ -216,9 +198,6 @@ public class RegistrationService {
     }
 
     private void validateMenteeAge(LocalDate birthDate) {
-        if (birthDate == null) {
-            throw new InvalidRegistrationRequestException("Дата рождения наставляемого обязательна.");
-        }
         int age = Period.between(birthDate, today).getYears();
         if (age > MAX_MENTEE_AGE) {
             throw new InvalidMenteeAgeException("Возраст наставляемого не может превышать " + MAX_MENTEE_AGE + " лет.");
@@ -226,9 +205,6 @@ public class RegistrationService {
     }
 
     private String normalizeEmail(String email) {
-        if (email == null) {
-            throw new InvalidRegistrationRequestException("Email не может быть null.");
-        }
         return email.trim().toLowerCase();
     }
 }

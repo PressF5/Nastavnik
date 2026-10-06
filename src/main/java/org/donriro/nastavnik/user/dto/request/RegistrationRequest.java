@@ -35,6 +35,7 @@ public record RegistrationRequest(
 
         @NotNull
         RoleCode role,
+
         Long msuId,
         Long educationalOrganizationId
 ) {
