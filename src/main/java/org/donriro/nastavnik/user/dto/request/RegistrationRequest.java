@@ -5,9 +5,11 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.donriro.nastavnik.user.role.RoleCode;
+import org.donriro.nastavnik.user.validation.ValidRegistration;
 
 import java.time.LocalDate;
 
+@ValidRegistration
 public record RegistrationRequest(
 
         @NotBlank

@@ -18,28 +18,20 @@ import org.donriro.nastavnik.user.status.AccountStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
-import java.time.Period;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
 @Transactional
 public class RegistrationService {
 
-    private static final int MAX_MENTEE_AGE = 35;
-
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final MsuRepository msuRepository;
     private final EducationalOrganizationRepository educationalOrganizationRepository;
-    // private final PasswordEncoder passwordEncoder;
-    LocalDate today = LocalDate.now(ZoneOffset.UTC);
+    private final PasswordEncoder passwordEncoder;
 
     public User register(RegistrationRequest request) {
-        validateCommonFields(request);
-
         RoleCode roleCode = request.role();
         Role role = getRole(roleCode);
 
@@ -56,7 +48,6 @@ public class RegistrationService {
     }
 
     private User registerMsuAdmin(RegistrationRequest request, String email, Role role) {
-        validateMsuScope(request);
         Msu msu = getMsu(request.msuId());
         checkMsuAdminUniqueness(msu);
 
@@ -66,8 +57,6 @@ public class RegistrationService {
     }
 
     private User registerOoAdmin(RegistrationRequest request, String email, Role role) {
-        validateEducationalOrganizationScope(request);
-
         EducationalOrganization educationalOrganization = getEducationalOrganization(request.educationalOrganizationId(), request.msuId());
         Msu msu = educationalOrganization.getMsu();
         Region region = msu.getRegion();
@@ -80,8 +69,6 @@ public class RegistrationService {
     }
 
     private User registerMentor(RegistrationRequest request, String email, Role role) {
-        validateEducationalOrganizationScope(request);
-
         EducationalOrganization educationalOrganization = getEducationalOrganization(request.educationalOrganizationId(), request.msuId());
         Msu msu = educationalOrganization.getMsu();
         Region region = msu.getRegion();
@@ -92,9 +79,6 @@ public class RegistrationService {
     }
 
     private User registerMentee(RegistrationRequest request, String email, Role role) {
-        validateEducationalOrganizationScope(request);
-        validateMenteeAge(request.birthDate());
-
         EducationalOrganization educationalOrganization = getEducationalOrganization(request.educationalOrganizationId(), request.msuId());
         Msu msu = educationalOrganization.getMsu();
         Region region = msu.getRegion();
@@ -112,7 +96,6 @@ public class RegistrationService {
         user.setLastName(request.lastName().trim());
 
         String middleName = request.middleName();
-
         if (middleName != null && !middleName.isBlank()) {
             user.setMiddleName(middleName.trim());
         }
@@ -126,36 +109,6 @@ public class RegistrationService {
         user.setBlocked(false);
 
         return user;
-    }
-
-    private void validateCommonFields(RegistrationRequest request) {
-        if (request == null) {
-            throw new InvalidRegistrationRequestException("Данные регистрации не могут быть null.");
-        }
-
-        if (request.birthDate() != null && request.birthDate().isAfter(today)) {
-            throw new InvalidRegistrationRequestException("Дата рождения не может быть в будущем.");
-        }
-    }
-
-    private void validateMsuScope(RegistrationRequest request) {
-        if (request.msuId() == null) {
-            throw new InvalidRegistrationScopeException("Для регистрации администратора МСУ необходимо указать МСУ.");
-        }
-
-        if (request.educationalOrganizationId() != null) {
-            throw new InvalidRegistrationScopeException("Для MSU_ADMIN образовательная организация не должна быть указана.");
-        }
-    }
-
-    private void validateEducationalOrganizationScope(RegistrationRequest request) {
-        if (request.msuId() == null) {
-            throw new InvalidRegistrationScopeException("Необходимо указать МСУ.");
-        }
-
-        if (request.educationalOrganizationId() == null) {
-            throw new InvalidRegistrationScopeException("Необходимо указать образовательную организацию.");
-        }
     }
 
     private void checkEmailUniqueness(String email) {
@@ -197,14 +150,7 @@ public class RegistrationService {
         return educationalOrganization;
     }
 
-    private void validateMenteeAge(LocalDate birthDate) {
-        int age = Period.between(birthDate, today).getYears();
-        if (age > MAX_MENTEE_AGE) {
-            throw new InvalidMenteeAgeException("Возраст наставляемого не может превышать " + MAX_MENTEE_AGE + " лет.");
-        }
-    }
-
     private String normalizeEmail(String email) {
-        return email.trim().toLowerCase();
+        return email.trim().toLowerCase(Locale.ROOT);
     }
 }
