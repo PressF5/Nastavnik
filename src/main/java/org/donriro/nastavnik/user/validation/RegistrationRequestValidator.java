@@ -21,7 +21,6 @@ public class RegistrationRequestValidator implements ConstraintValidator<ValidRe
     private static final String EDUCATIONAL_ORGANIZATION_ID_FIELD_NAME = "educationalOrganizationId";
     private static final String MSU_ID_FIELD_NAME = "msuId";
     private static final String BIRTHDATE_FIELD_NAME = "birthDate";
-    private static final String ROLE_FIELD_NAME = "role";
 
     @Override
     public boolean isValid(RegistrationRequest request, ConstraintValidatorContext context) {
@@ -36,17 +35,12 @@ public class RegistrationRequestValidator implements ConstraintValidator<ValidRe
         boolean valid = validateBirthDate(request.birthDate(), today, context);
 
         valid &= switch (request.role()) {
-            case REGION_ADMIN -> validateRegionAdmin(context);
+            case REGION_ADMIN -> true;
             case MSU_ADMIN -> validateMsuAdmin(request, context);
             case OO_ADMIN, MENTOR, MENTEE -> validateEducationalOrganizationUser(request, today, context);
         };
 
         return valid;
-    }
-
-    private boolean validateRegionAdmin(ConstraintValidatorContext context) {
-        addViolation(context, ROLE_FIELD_NAME, "REGION_ADMIN нельзя зарегистрировать через обычную регистрацию.");
-        return false;
     }
 
     private boolean validateMsuAdmin(RegistrationRequest request, ConstraintValidatorContext context) {
@@ -67,7 +61,11 @@ public class RegistrationRequestValidator implements ConstraintValidator<ValidRe
         valid &= validateMsuId(request, context);
         valid &= validateEducationalOrganizationId(request, context);
         valid &= validateOrganizationBelongsToMsu(request, context);
-        valid &= validateMenteeAge(request, today, context);
+
+        if (request.role() == RoleCode.MENTEE) {
+            valid &= validateMenteeAge(request, today, context);
+        }
+
         return valid;
     }
 
@@ -100,7 +98,7 @@ public class RegistrationRequestValidator implements ConstraintValidator<ValidRe
     }
 
     private boolean validateMenteeAge(RegistrationRequest request, LocalDate today, ConstraintValidatorContext context) {
-        if (request.role() != RoleCode.MENTEE) {
+        if (request.birthDate() == null) {
             return true;
         }
         int age = Period.between(request.birthDate(), today).getYears();
@@ -112,6 +110,10 @@ public class RegistrationRequestValidator implements ConstraintValidator<ValidRe
     }
 
     private boolean validateBirthDate(LocalDate birthDate, LocalDate today, ConstraintValidatorContext context) {
+        if (birthDate == null) {
+            return true;
+        }
+
         if (!birthDate.isAfter(today)) {
             return true;
         }

@@ -1,6 +1,5 @@
 package org.donriro.nastavnik.user.service;
 
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.donriro.nastavnik.organization.educationalorganization.entity.EducationalOrganization;
 import org.donriro.nastavnik.organization.educationalorganization.repository.EducationalOrganizationRepository;
@@ -17,12 +16,13 @@ import org.donriro.nastavnik.user.role.RoleCode;
 import org.donriro.nastavnik.user.status.AccountStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
-@Transactional
+@Transactional(readOnly = true)
 public class RegistrationService {
 
     private final UserRepository userRepository;
@@ -31,7 +31,10 @@ public class RegistrationService {
     private final EducationalOrganizationRepository educationalOrganizationRepository;
     private final PasswordEncoder passwordEncoder;
 
+    @Transactional
     public User register(RegistrationRequest request) {
+        checkRegionInitialized();
+
         RoleCode roleCode = request.role();
         Role role = getRole(roleCode);
 
@@ -45,6 +48,12 @@ public class RegistrationService {
             case MENTEE -> registerMentee(request, normalizedEmail, role);
             case REGION_ADMIN -> throw new InvalidRegistrationRoleException("Регистрация REGION_ADMIN через обычную регистрацию запрещена.");
         };
+    }
+
+    private void checkRegionInitialized() {
+        if (!userRepository.existsByRoleCode(RoleCode.REGION_ADMIN)) {
+            throw new RegionNotInitializedException("Регистрация пользователей недоступна до создания регионального администратора.");
+        }
     }
 
     private User registerMsuAdmin(RegistrationRequest request, String email, Role role) {

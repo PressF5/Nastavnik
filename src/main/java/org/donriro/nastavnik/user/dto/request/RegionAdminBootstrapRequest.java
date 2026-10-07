@@ -1,13 +1,10 @@
 package org.donriro.nastavnik.user.dto.request;
 
 import jakarta.validation.constraints.*;
-import org.donriro.nastavnik.user.role.RoleCode;
-import org.donriro.nastavnik.user.validation.ValidRegistration;
 
 import java.time.LocalDate;
 
-@ValidRegistration
-public record RegistrationRequest(
+public record RegionAdminBootstrapRequest(
 
         @NotBlank
         @Size(max = 100)
@@ -29,16 +26,16 @@ public record RegistrationRequest(
         @Size(min = 8, max = 100)
         String password,
 
+        @PastOrPresent
         @NotNull
         LocalDate birthDate,
 
         @NotNull
-        RoleCode role,
-
         @Positive
-        Long msuId,
+        Integer regionCode,
 
-        @Positive
-        Long educationalOrganizationId
+        @NotBlank
+        @Size(max = 500)
+        String regionName
 ) {
 }
