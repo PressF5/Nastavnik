@@ -1,8 +1,10 @@
 package org.donriro.nastavnik.config.common.exception;
 
+import org.donriro.nastavnik.security.exception.InvalidRefreshTokenException;
 import org.donriro.nastavnik.user.exception.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -81,6 +83,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(RegionAlreadyInitializedException.class)
     public ResponseEntity<ApiError> handleRegionAlreadyInitialized(RegionAlreadyInitializedException exception) {
         return buildError(HttpStatus.CONFLICT, ErrorCode.REGION_ALREADY_INITIALIZED, exception.getMessage());
+    }
+
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<ApiError> handleInvalidCredentials(InvalidCredentialsException exception) {
+        return buildError(HttpStatus.UNAUTHORIZED, ErrorCode.INVALID_CREDENTIALS, exception.getMessage());
+    }
+
+    @ExceptionHandler(InvalidRefreshTokenException.class)
+    public ResponseEntity<ApiError> handleInvalidRefreshToken(InvalidRefreshTokenException exception) {
+        return buildError(HttpStatus.UNAUTHORIZED, ErrorCode.INVALID_REFRESH_TOKEN, exception.getMessage());
     }
 
     private ResponseEntity<ApiError> buildError(HttpStatus status, ErrorCode code, String message) {

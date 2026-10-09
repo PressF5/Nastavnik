@@ -52,7 +52,10 @@ databaseChangeLog:
       file: db/changelog/016-create-mentorship-audit-log.sql
 
   - include:
-      file: db/changelog/017-create-indexes.sql
+      file: db/changelog/017-create-refresh-token.sql
 
   - include:
       file: db/changelog/018-create-unique-partial-indexes.sql
+
+  - include:
+      file: db/changelog/019-create-indexes.sql
