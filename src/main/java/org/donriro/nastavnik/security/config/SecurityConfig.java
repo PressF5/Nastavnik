@@ -45,7 +45,8 @@ public class SecurityConfig {
                                 "/api/auth/logout",
                                 "/api/auth/csrf",
                                 "/api/bootstrap/status",
-                                "/api/bootstrap/region-admin"
+                                "/api/bootstrap/region-admin",
+                                "/api/registration"
                         ).permitAll()
                         .anyRequest()
                         .authenticated())
