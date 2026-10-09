@@ -21,3 +21,11 @@ logging:
     org:
       springframework:
         security: TRACE
+        web: DEBUG
+        boot:
+          autoconfigure:
+            web:
+              servlet:
+                error: DEBUG
+      donriro:
+        nastavnik: DEBUG

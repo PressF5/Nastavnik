@@ -10,6 +10,7 @@ public record RegistrationResponse(
         String firstName,
         String lastName,
         String middleName,
+        boolean isBlock,
         RoleCode role,
         AccountStatus accountStatus
 ) {
@@ -21,6 +22,7 @@ public record RegistrationResponse(
                 user.getFirstName(),
                 user.getLastName(),
                 user.getMiddleName(),
+                user.isBlocked(),
                 user.getRole().getCode(),
                 user.getAccountStatus()
         );

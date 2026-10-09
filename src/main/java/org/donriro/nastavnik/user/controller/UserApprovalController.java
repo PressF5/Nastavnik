@@ -38,4 +38,22 @@ public class UserApprovalController {
         User user = userApprovalService.reject(principal.getUser().getId(), id);
         return ResponseEntity.ok(RegistrationResponse.from(user));
     }
+
+    @PatchMapping("/{id}/restore-approval")
+    public ResponseEntity<RegistrationResponse> restoreApproval(@AuthenticationPrincipal CustomUserDetails principal, @PathVariable Long id) {
+        User user = userApprovalService.restoreApproval(principal.getUser().getId(), id);
+        return ResponseEntity.ok(RegistrationResponse.from(user));
+    }
+
+    @PatchMapping("/{id}/block")
+    public ResponseEntity<RegistrationResponse> block(@AuthenticationPrincipal CustomUserDetails principal, @PathVariable Long id) {
+        User user = userApprovalService.blockUser(principal.getUser().getId(), id);
+        return ResponseEntity.ok(RegistrationResponse.from(user));
+    }
+
+    @PatchMapping("/{id}/unblock")
+    public ResponseEntity<RegistrationResponse> unblock(@AuthenticationPrincipal CustomUserDetails principal, @PathVariable Long id) {
+        User user = userApprovalService.unblockUser(principal.getUser().getId(), id);
+        return ResponseEntity.ok(RegistrationResponse.from(user));
+    }
 }

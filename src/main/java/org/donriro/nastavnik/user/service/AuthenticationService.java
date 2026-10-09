@@ -11,6 +11,7 @@ import org.donriro.nastavnik.security.principal.AuthenticationResult;
 import org.donriro.nastavnik.security.principal.CustomUserDetails;
 import org.donriro.nastavnik.security.jwt.JwtService;
 import org.donriro.nastavnik.user.repository.UserRepository;
+import org.donriro.nastavnik.user.status.AccountStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
@@ -50,12 +51,19 @@ public class AuthenticationService {
     @Transactional
     public AuthenticationResult refresh(String rawRefreshToken) {
         RefreshTokenRotation rotation = refreshTokenService.rotateToken(rawRefreshToken);
+        User user = userRepository.findById(rotation.userId())
+                .orElseThrow(() -> new InvalidRefreshTokenException("Пользователь не найден."));
 
-        User user = userRepository.findById(rotation.userId()).orElseThrow(() -> new InvalidRefreshTokenException("Пользователь не найден."));
+        // Проверяем актуальное состояние аккаунта из БД.
+        if (user.getAccountStatus() != AccountStatus.ACCEPTED || user.isBlocked()) {
+            // Отзываем только что созданный refresh-токен,
+            // поскольку клиенту он не будет выдан.
+            refreshTokenService.revokeByRawToken(rotation.refreshToken());
+            throw new InvalidRefreshTokenException("Аккаунт неактивен или заблокирован.");
+        }
+
         CustomUserDetails userDetails = new CustomUserDetails(user);
-
         String accessToken = jwtService.generateAccessToken(userDetails);
-
         return new AuthenticationResult(user, accessToken, rotation.refreshToken());
     }
 
