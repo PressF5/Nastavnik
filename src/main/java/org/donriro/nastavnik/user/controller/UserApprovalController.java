@@ -4,8 +4,15 @@ import lombok.RequiredArgsConstructor;
 import org.donriro.nastavnik.security.principal.CustomUserDetails;
 import org.donriro.nastavnik.user.dto.response.RegistrationResponse;
 import org.donriro.nastavnik.user.entity.User;
+import org.donriro.nastavnik.user.role.RoleCode;
 import org.donriro.nastavnik.user.service.UserApprovalService;
+import org.donriro.nastavnik.user.status.AccountStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,14 +24,25 @@ import java.util.List;
 public class UserApprovalController {
     private final UserApprovalService userApprovalService;
 
-    @GetMapping("/pending")
-    public ResponseEntity<List<RegistrationResponse>> getPendingUsers(@AuthenticationPrincipal CustomUserDetails principal) {
-        List<RegistrationResponse> response = userApprovalService
-                .getPendingUsers(principal.getUser().getId())
-                .stream()
-                .map(RegistrationResponse::from)
-                .toList();
-        return ResponseEntity.ok(response);
+    @GetMapping
+    public Page<RegistrationResponse> getUsers(
+            @RequestParam(required = false) RoleCode role,
+            @RequestParam(required = false) AccountStatus status,
+            @RequestParam(required = false) Boolean blocked,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            Authentication authentication) {
+        if (page < 0) {
+            throw new IllegalArgumentException("Номер страницы не может быть отрицательным.");
+        }
+
+        if (size < 1 || size > 100) {
+            throw new IllegalArgumentException("Размер страницы должен быть от 1 до 100.");
+        }
+
+        CustomUserDetails principal = (CustomUserDetails) authentication.getPrincipal();
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "id"));
+        return userApprovalService.getUsers(principal.getUser().getId(), role, status, blocked, pageable).map(RegistrationResponse::from);
     }
 
     @PatchMapping("/{id}/approve")

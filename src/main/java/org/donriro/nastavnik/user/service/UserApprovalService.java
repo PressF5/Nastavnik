@@ -1,5 +1,6 @@
 package org.donriro.nastavnik.user.service;
 
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.donriro.nastavnik.user.entity.User;
 import org.donriro.nastavnik.user.entity.UserAuditLog;
@@ -8,11 +9,16 @@ import org.donriro.nastavnik.user.repository.UserRepository;
 import org.donriro.nastavnik.user.role.RoleCode;
 import org.donriro.nastavnik.user.status.AccountStatus;
 import org.donriro.nastavnik.user.status.AuditSource;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -84,6 +90,41 @@ public class UserApprovalService {
     @Transactional
     public User unblockUser(Long actorId, Long targetId) {
         return changeBlockedStatus(actorId, targetId, false);
+    }
+
+    public Page<User> getUsers(Long actorId, RoleCode role, AccountStatus status, Boolean blocked, Pageable pageable) {
+        User actor = getUser(actorId);
+
+        Specification<User> specification = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            // Фильтр по роли.
+            if (role != null) {
+                predicates.add(cb.equal(root.get("role").get("code"), role));
+            }
+
+            // Фильтр по статусу аккаунта.
+            if (status != null) {
+                predicates.add(cb.equal(root.get("accountStatus"), status));
+            }
+
+            // Фильтр по блокировке.
+            if (blocked != null) {
+                predicates.add(cb.equal(root.get("blocked"), blocked));
+            }
+
+            // Ограничиваем выборку административной областью.
+            switch (actor.getRole().getCode()) {
+                case REGION_ADMIN -> predicates.add(cb.equal(root.get("region").get("id"), actor.getRegion().getId()));
+                case MSU_ADMIN -> predicates.add(cb.equal(root.get("educationalOrganization").get("msu").get("id"), actor.getMsu().getId()));
+                case OO_ADMIN -> predicates.add(cb.equal(root.get("educationalOrganization").get("id"), actor.getEducationalOrganization().getId()));
+                default -> throw new AccessDeniedException("Недостаточно прав для просмотра списка пользователей.");
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        return userRepository.findAll(specification, pageable);
     }
 
     private User changeBlockedStatus(Long actorId, Long targetId, boolean newBlockedStatus) {

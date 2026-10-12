@@ -9,6 +9,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -94,6 +95,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleInvalidRefreshToken(InvalidRefreshTokenException exception) {
         return buildError(HttpStatus.UNAUTHORIZED, ErrorCode.INVALID_REFRESH_TOKEN, exception.getMessage());
     }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalArgument( IllegalArgumentException exception ) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of( "timestamp", Instant.now().toString(),
+                        "status", HttpStatus.BAD_REQUEST.value(),
+                        "error", "Bad Request",
+                        "message", exception.getMessage() )); }
 
     private ResponseEntity<ApiError> buildError(HttpStatus status, ErrorCode code, String message) {
         return ResponseEntity.status(status).body(new ApiError(code, message));
