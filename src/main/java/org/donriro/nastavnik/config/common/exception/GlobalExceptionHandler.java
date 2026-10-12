@@ -1,7 +1,10 @@
 package org.donriro.nastavnik.config.common.exception;
 
+import org.donriro.nastavnik.profile.field.exception.StaleProfileFieldException;
 import org.donriro.nastavnik.security.exception.InvalidRefreshTokenException;
 import org.donriro.nastavnik.user.exception.*;
+import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -94,6 +97,36 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidRefreshTokenException.class)
     public ResponseEntity<ApiError> handleInvalidRefreshToken(InvalidRefreshTokenException exception) {
         return buildError(HttpStatus.UNAUTHORIZED, ErrorCode.INVALID_REFRESH_TOKEN, exception.getMessage());
+    }
+
+    @ExceptionHandler(StaleProfileFieldException.class)
+    public ResponseEntity<ApiError> handleStaleProfileField(StaleProfileFieldException exception) {
+        return buildError(HttpStatus.CONFLICT, ErrorCode.STALE_PROFILE_FIELD, exception.getMessage());
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiError> handleDataIntegrityViolation(DataIntegrityViolationException exception) {
+        String constraintName = findConstraintName(exception);
+
+        return switch (constraintName) {
+            case "uk_users_email" -> buildError(HttpStatus.CONFLICT, ErrorCode.EMAIL_ALREADY_EXISTS, "Пользователь с таким email уже зарегистрирован.");
+            case "uk_users_one_region_admin" -> buildError(HttpStatus.CONFLICT, ErrorCode.REGION_ALREADY_INITIALIZED, "Региональный администратор уже зарегистрирован.");
+            case "uk_region_code" -> buildError(HttpStatus.CONFLICT, ErrorCode.REGION_ALREADY_EXISTS, "Регион с таким кодом уже существует.");
+            case "uk_users_one_msu_admin", "uk_users_one_oo_admin" -> buildError(HttpStatus.CONFLICT, ErrorCode.ADMINISTRATOR_ALREADY_EXISTS, "Для указанной территории уже существует администратор.");
+            default -> buildError(HttpStatus.CONFLICT, ErrorCode.DATA_INTEGRITY_VIOLATION, "Операция конфликтует с ограничениями базы данных.");
+        };
+    }
+
+    private String findConstraintName(Throwable exception) {
+        Throwable current = exception;
+
+        while (current != null) {
+            if (current instanceof ConstraintViolationException violation) {
+                return violation.getConstraintName() != null ? violation.getConstraintName() : "";
+            }
+            current = current.getCause();
+        }
+        return "";
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

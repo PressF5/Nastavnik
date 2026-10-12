@@ -30,4 +30,11 @@ public class ProfileField extends BaseEntity {
 
     @Column(nullable = false)
     private boolean active = true;
+
+    @Column(name = "matching_enabled", nullable = false)
+    private boolean matchingEnabled = false;
+
+    @Version
+    @Column(nullable = false)
+    private Long version;
 }

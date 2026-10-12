@@ -40,12 +40,7 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
         """)
     Optional<User> findByEmailWithSecurityData(@Param("email") String email);
 
-    @EntityGraph(attributePaths = {
-            "role",
-            "region",
-            "msu",
-            "educationalOrganization"
-    })
+    @EntityGraph(attributePaths = {"role", "region", "msu", "educationalOrganization"})
     @Override
     Page<User> findAll(Specification<User> spec, Pageable pageable);
 }
