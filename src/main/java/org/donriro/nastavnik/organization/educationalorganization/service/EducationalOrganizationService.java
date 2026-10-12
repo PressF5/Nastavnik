@@ -9,6 +9,7 @@ import org.donriro.nastavnik.user.repository.UserRepository;
 import org.donriro.nastavnik.user.role.RoleCode;
 import org.donriro.nastavnik.user.status.AccountStatus;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -22,6 +23,7 @@ public class EducationalOrganizationService {
     private final UserRepository userRepository;
 
     @Transactional
+    @PreAuthorize("@roleAccess.isMsuAdmin(authentication)")
     public EducationalOrganization create(Long actorId, CreateEducationalOrganizationRequest request) {
         User actor = getUser(actorId);
 

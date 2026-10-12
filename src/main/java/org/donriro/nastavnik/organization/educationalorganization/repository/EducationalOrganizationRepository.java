@@ -11,5 +11,6 @@ public interface EducationalOrganizationRepository extends JpaRepository<Educati
 
     List<EducationalOrganization> findAllByMsuId(Long msuId);
     boolean existsByIdAndMsuId(Long id, Long msuId);
+    boolean existsByIdAndMsuRegionId(Long id, Long regionId);
     boolean existsByMsuIdAndCode(Long msuId, Integer code);
 }
