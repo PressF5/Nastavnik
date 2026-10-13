@@ -13,7 +13,8 @@ public record ProfileFieldResponse(
         boolean searchable,
         boolean active,
         boolean matchingEnabled,
-        List<ProfileFieldRoleResponse> roles
+        List<ProfileFieldRoleResponse> roles,
+        List<ProfileFieldOptionResponse> options
 ) {
     public record ProfileFieldRoleResponse(
             RoleCode roleCode,
