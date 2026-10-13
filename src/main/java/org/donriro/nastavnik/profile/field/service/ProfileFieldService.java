@@ -89,9 +89,6 @@ public class ProfileFieldService {
         ProfileFieldType currentType = field.getFieldType();
         ProfileFieldType requestedType = request.fieldType();
 
-        boolean currentIsChoice = isChoiceField(currentType);
-        boolean requestedIsChoice = isChoiceField(requestedType);
-
         if (currentType != requestedType) {
             boolean hasOptions =
                     profileFieldOptionService.hasOptions(field.getId());
@@ -101,9 +98,7 @@ public class ProfileFieldService {
             }
 
             if (!isChoiceField(currentType) && isChoiceField(requestedType)) {
-                throw new ProfileFieldOptionsRequiredException(
-                        "Для перехода к SELECT или MULTISELECT необходимо предусмотреть передачу вариантов поля."
-                );
+                throw new ProfileFieldOptionsRequiredException("Для перехода к SELECT или MULTISELECT необходимо предусмотреть передачу вариантов поля.");
             }
         }
 
