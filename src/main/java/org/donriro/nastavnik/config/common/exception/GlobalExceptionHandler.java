@@ -1,7 +1,7 @@
 package org.donriro.nastavnik.config.common.exception;
 
 import jakarta.persistence.OptimisticLockException;
-import org.donriro.nastavnik.profile.field.exception.StaleProfileFieldException;
+import org.donriro.nastavnik.profile.field.exception.*;
 import org.donriro.nastavnik.security.exception.InvalidRefreshTokenException;
 import org.donriro.nastavnik.user.exception.*;
 import org.hibernate.exception.ConstraintViolationException;
@@ -9,7 +9,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -99,6 +98,31 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidRefreshTokenException.class)
     public ResponseEntity<ApiError> handleInvalidRefreshToken(InvalidRefreshTokenException exception) {
         return buildError(HttpStatus.UNAUTHORIZED, ErrorCode.INVALID_REFRESH_TOKEN, exception.getMessage());
+    }
+
+    @ExceptionHandler(ProfileFieldTypeChangeNotAllowedException.class)
+    public ResponseEntity<ApiError> handleProfileFieldTypeChangeNotAllowed(ProfileFieldTypeChangeNotAllowedException exception) {
+        return buildError(HttpStatus.CONFLICT, ErrorCode.PROFILE_FIELD_TYPE_CHANGE_NOT_ALLOWED, exception.getMessage());
+    }
+
+    @ExceptionHandler(ProfileFieldNotFoundException.class)
+    public ResponseEntity<ApiError> handleProfileFieldNotFound(ProfileFieldNotFoundException exception) {
+        return buildError(HttpStatus.NOT_FOUND, ErrorCode.PROFILE_FIELD_NOT_FOUND, exception.getMessage());
+    }
+
+    @ExceptionHandler(ProfileFieldAlreadyExistsException.class)
+    public ResponseEntity<ApiError> handleProfileFieldAlreadyExists(ProfileFieldAlreadyExistsException exception) {
+        return buildError(HttpStatus.CONFLICT, ErrorCode.PROFILE_FIELD_ALREADY_EXISTS, exception.getMessage());
+    }
+
+    @ExceptionHandler(InactiveProfileFieldException.class)
+    public ResponseEntity<ApiError> handleInactiveProfileField(InactiveProfileFieldException exception) {
+        return buildError(HttpStatus.CONFLICT, ErrorCode.INACTIVE_PROFILE_FIELD, exception.getMessage());
+    }
+
+    @ExceptionHandler(ProfileFieldOptionsRequiredException.class)
+    public ResponseEntity<ApiError> handleProfileFieldOptionsRequired(ProfileFieldOptionsRequiredException exception) {
+        return buildError(HttpStatus.BAD_REQUEST, ErrorCode.PROFILE_FIELD_TYPE_CHANGE_NOT_ALLOWED, exception.getMessage());
     }
 
     @ExceptionHandler({StaleProfileFieldException.class, ObjectOptimisticLockingFailureException.class, OptimisticLockException.class})

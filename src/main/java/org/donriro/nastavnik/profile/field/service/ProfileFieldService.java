@@ -7,7 +7,7 @@ import org.donriro.nastavnik.profile.field.dto.*;
 import org.donriro.nastavnik.profile.field.entity.ProfileField;
 import org.donriro.nastavnik.profile.field.entity.ProfileFieldRole;
 import org.donriro.nastavnik.profile.field.entity.ProfileFieldRoleId;
-import org.donriro.nastavnik.profile.field.exception.StaleProfileFieldException;
+import org.donriro.nastavnik.profile.field.exception.*;
 import org.donriro.nastavnik.profile.field.repository.ProfileFieldRepository;
 import org.donriro.nastavnik.profile.field.repository.ProfileFieldRoleRepository;
 import org.donriro.nastavnik.profile.field.type.ProfileFieldType;
@@ -71,10 +71,10 @@ public class ProfileFieldService {
         validateUpdateRequest(request);
 
         ProfileField field = profileFieldRepository.findById(fieldId)
-                .orElseThrow(() -> new IllegalArgumentException("Поле профиля не найдено: " + fieldId));
+                .orElseThrow(() -> new ProfileFieldNotFoundException("Поле профиля с id=" + fieldId + " не найдено."));
 
         if (!field.isActive()) {
-            throw new IllegalStateException("Нельзя редактировать деактивированное поле.");
+            throw new InactiveProfileFieldException("Нельзя редактировать деактивированное поле.");
         }
 
         // Защита от устаревшей формы.
@@ -84,6 +84,27 @@ public class ProfileFieldService {
 
         if (profileFieldRepository.existsByNameIgnoreCaseAndIdNot(request.name().trim(), fieldId)) {
             throw new IllegalArgumentException("Поле с таким названием уже существует.");
+        }
+
+        ProfileFieldType currentType = field.getFieldType();
+        ProfileFieldType requestedType = request.fieldType();
+
+        boolean currentIsChoice = isChoiceField(currentType);
+        boolean requestedIsChoice = isChoiceField(requestedType);
+
+        if (currentType != requestedType) {
+            boolean hasOptions =
+                    profileFieldOptionService.hasOptions(field.getId());
+
+            if (isChoiceField(currentType) && !isChoiceField(requestedType) && hasOptions) {
+                throw new ProfileFieldTypeChangeNotAllowedException("Нельзя изменить тип поля, пока у него существуют варианты.");
+            }
+
+            if (!isChoiceField(currentType) && isChoiceField(requestedType)) {
+                throw new ProfileFieldOptionsRequiredException(
+                        "Для перехода к SELECT или MULTISELECT необходимо предусмотреть передачу вариантов поля."
+                );
+            }
         }
 
         field.setName(request.name().trim());
@@ -121,7 +142,7 @@ public class ProfileFieldService {
     @Transactional
     public void deactivate(Long fieldId) {
         ProfileField field = profileFieldRepository.findById(fieldId)
-                .orElseThrow(() -> new IllegalArgumentException("Поле профиля не найдено: " + fieldId));
+                .orElseThrow(() -> new ProfileFieldNotFoundException("Поле профиля с id=" + fieldId + " не найдено."));
 
         field.setActive(false);
         field.setMatchingEnabled(false);

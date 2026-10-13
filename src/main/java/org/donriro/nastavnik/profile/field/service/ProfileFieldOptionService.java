@@ -150,6 +150,10 @@ public class ProfileFieldOptionService {
                 .toList();
     }
 
+    public boolean hasOptions(Long fieldId) {
+        return optionRepository.existsByProfileField_Id(fieldId);
+    }
+
     private ProfileField getField(Long fieldId) {
         return fieldRepository.findById(fieldId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Поле анкеты не найдено: " + fieldId));

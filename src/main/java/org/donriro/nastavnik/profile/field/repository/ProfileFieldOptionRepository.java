@@ -13,6 +13,7 @@ public interface ProfileFieldOptionRepository extends JpaRepository<ProfileField
     Optional<ProfileFieldOption> findByIdAndProfileField_Id(Long id, Long profileFieldId);
     boolean existsByProfileField_IdAndValue(Long profileFieldId, String value);
     boolean existsByProfileField_IdAndValueAndIdNot(Long profileFieldId, String value, Long id);
+    boolean existsByProfileField_Id(Long profileFieldId);
     List<ProfileFieldOption> findAllByProfileField_IdOrderBySortOrderAscIdAsc(Long profileFieldId);
     List<ProfileFieldOption> findAllByProfileField_IdAndActiveTrueOrderBySortOrderAscIdAsc(Long profileFieldId);
 }
