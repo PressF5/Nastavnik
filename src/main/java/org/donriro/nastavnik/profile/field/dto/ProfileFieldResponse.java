@@ -19,10 +19,7 @@ public record ProfileFieldResponse(
     public record ProfileFieldRoleResponse(
             RoleCode roleCode,
             boolean required,
-            int sortOrder,
-            boolean matchingEnabled,
-            List<ProfileFieldRoleResponse> roles,
-            List<ProfileFieldOptionResponse> options
+            int sortOrder
     ) {
     }
 }

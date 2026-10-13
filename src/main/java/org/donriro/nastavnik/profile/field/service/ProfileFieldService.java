@@ -384,7 +384,8 @@ public class ProfileFieldService {
                 field.isSearchable(),
                 field.isActive(),
                 field.isMatchingEnabled(),
-                roles
+                roles,
+                options
         );
     }
 }
