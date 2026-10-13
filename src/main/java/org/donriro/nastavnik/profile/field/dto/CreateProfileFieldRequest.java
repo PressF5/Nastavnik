@@ -23,7 +23,10 @@ public record CreateProfileFieldRequest(
         @Size(min = 1, max = 2)
         List<@Valid ProfileFieldRoleRequest> roles,
 
-        boolean matchingEnabled
+        boolean matchingEnabled,
+
+        @Valid
+        List<@Valid ProfileFieldOptionRequest> options
 
 ) {
 }
