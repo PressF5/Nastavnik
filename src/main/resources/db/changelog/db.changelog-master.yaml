@@ -66,3 +66,5 @@ databaseChangeLog:
   - include:
       file: db/changelog/021-add-profile-field-version.sql
 
+  - include:
+      file: db/changelog/022-add-sort-order-to-profile-field-option.sql

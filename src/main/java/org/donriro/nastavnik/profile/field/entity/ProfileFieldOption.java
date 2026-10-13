@@ -29,4 +29,7 @@ public class ProfileFieldOption extends BaseEntity {
 
     @Column(nullable = false)
     private boolean active = true;
+
+    @Column(name = "sort_order", nullable = false)
+    private int sortOrder;
 }

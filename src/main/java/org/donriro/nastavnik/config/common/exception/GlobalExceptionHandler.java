@@ -1,5 +1,6 @@
 package org.donriro.nastavnik.config.common.exception;
 
+import jakarta.persistence.OptimisticLockException;
 import org.donriro.nastavnik.profile.field.exception.StaleProfileFieldException;
 import org.donriro.nastavnik.security.exception.InvalidRefreshTokenException;
 import org.donriro.nastavnik.user.exception.*;
@@ -7,6 +8,7 @@ import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -99,9 +101,13 @@ public class GlobalExceptionHandler {
         return buildError(HttpStatus.UNAUTHORIZED, ErrorCode.INVALID_REFRESH_TOKEN, exception.getMessage());
     }
 
-    @ExceptionHandler(StaleProfileFieldException.class)
-    public ResponseEntity<ApiError> handleStaleProfileField(StaleProfileFieldException exception) {
-        return buildError(HttpStatus.CONFLICT, ErrorCode.STALE_PROFILE_FIELD, exception.getMessage());
+    @ExceptionHandler({StaleProfileFieldException.class, ObjectOptimisticLockingFailureException.class, OptimisticLockException.class})
+    public ResponseEntity<ApiError> handleOptimisticLockConflict(RuntimeException exception) {
+        if (exception instanceof StaleProfileFieldException staleException) {
+            return buildError(HttpStatus.CONFLICT, ErrorCode.STALE_PROFILE_FIELD, staleException.getMessage());
+        }
+
+        return buildError(HttpStatus.CONFLICT, ErrorCode.STALE_PROFILE_FIELD, "Поле профиля было изменено другим запросом. Обновите данные и повторите операцию.");
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

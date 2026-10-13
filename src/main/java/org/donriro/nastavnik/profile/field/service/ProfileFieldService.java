@@ -1,5 +1,7 @@
 package org.donriro.nastavnik.profile.field.service;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import lombok.RequiredArgsConstructor;
 import org.donriro.nastavnik.profile.field.dto.CreateProfileFieldRequest;
 import org.donriro.nastavnik.profile.field.dto.ProfileFieldResponse;
@@ -14,8 +16,10 @@ import org.donriro.nastavnik.profile.field.repository.ProfileFieldRoleRepository
 import org.donriro.nastavnik.user.entity.Role;
 import org.donriro.nastavnik.user.repository.RoleRepository;
 import org.donriro.nastavnik.user.role.RoleCode;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
 import java.util.function.Function;
@@ -23,6 +27,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class ProfileFieldService {
 
     private static final Set<RoleCode> ALLOWED_ROLES = EnumSet.of(RoleCode.MENTOR, RoleCode.MENTEE);
@@ -30,6 +35,8 @@ public class ProfileFieldService {
     private final ProfileFieldRepository profileFieldRepository;
     private final ProfileFieldRoleRepository profileFieldRoleRepository;
     private final RoleRepository roleRepository;
+
+    private final EntityManager entityManager;
 
     @Transactional
     public ProfileFieldResponse create(CreateProfileFieldRequest request) {
@@ -56,6 +63,9 @@ public class ProfileFieldService {
 
     @Transactional
     public ProfileFieldResponse update(Long fieldId, UpdateProfileFieldRequest request) {
+        // Сначала проверяем запрос, чтобы исключить NullPointerException.
+        validateUpdateRequest(request);
+
         ProfileField field = profileFieldRepository.findById(fieldId)
                 .orElseThrow(() -> new IllegalArgumentException("Поле профиля не найдено: " + fieldId));
 
@@ -63,11 +73,10 @@ public class ProfileFieldService {
             throw new IllegalStateException("Нельзя редактировать деактивированное поле.");
         }
 
+        // Защита от устаревшей формы.
         if (!field.getVersion().equals(request.expectedVersion())) {
             throw new StaleProfileFieldException(fieldId, request.expectedVersion(), field.getVersion());
         }
-
-        validateUpdateRequest(request);
 
         if (profileFieldRepository.existsByNameIgnoreCaseAndIdNot(request.name().trim(), fieldId)) {
             throw new IllegalArgumentException("Поле с таким названием уже существует.");
@@ -79,15 +88,28 @@ public class ProfileFieldService {
 
         replaceRoles(field, request.roles());
 
-        boolean assignedToBoth =
-                request.roles().stream()
-                        .map(ProfileFieldRoleRequest::roleCode)
-                        .collect(Collectors.toSet())
-                        .containsAll(Set.of(RoleCode.MENTOR, RoleCode.MENTEE));
+        boolean assignedToBoth = request.roles().stream()
+                .map(ProfileFieldRoleRequest::roleCode)
+                .collect(Collectors.toSet())
+                .containsAll(Set.of(RoleCode.MENTOR, RoleCode.MENTEE));
 
-        field.setMatchingEnabled(
-                request.matchingEnabled() && assignedToBoth
-        );
+        field.setMatchingEnabled(request.matchingEnabled() && assignedToBoth);
+
+        /*
+         * Назначения profile_field_role тоже должны учитываться
+         * при конкурентном редактировании.
+         *
+         * OPTIMISTIC_FORCE_INCREMENT запрашивает увеличение версии
+         * родительской сущности даже тогда, когда её обычные поля
+         * не изменились, а изменились только назначения ролей.
+         */
+        entityManager.lock(field, LockModeType.OPTIMISTIC_FORCE_INCREMENT);
+
+        // Выполняем SQL до формирования ответа.
+        entityManager.flush();
+
+        // Возвращаем актуальную версию после синхронизации.
+        entityManager.refresh(field);
 
         return toResponse(field);
     }
@@ -99,6 +121,31 @@ public class ProfileFieldService {
 
         field.setActive(false);
         field.setMatchingEnabled(false);
+    }
+
+    @Transactional
+    public void activate(Long id) {
+        ProfileField field = profileFieldRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Поле анкеты с ID " + id + " не найдено."));
+
+        if (field.isActive()) {
+            return;
+        }
+
+        field.setActive(true);
+    }
+
+    public ProfileFieldResponse getById(Long id) {
+        ProfileField field = profileFieldRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Поле анкеты с ID " + id + " не найдено."));
+        return toResponse(field);
+    }
+
+    public List<ProfileFieldResponse> getAll() {
+        return profileFieldRepository.findAll()
+                .stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     private void validateUpdateRequest(UpdateProfileFieldRequest request) {
