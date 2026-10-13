@@ -39,18 +39,21 @@ public class ProfileFieldOptionService {
     public ProfileFieldOptionResponse create(Long fieldId, ProfileFieldOptionRequest request) {
         ProfileField field = getField(fieldId);
         validateFieldType(field);
+        validateOptionRequest(request);
 
         if (!field.isActive()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Нельзя добавлять варианты к неактивному полю.");
         }
 
-        if (optionRepository.existsByProfileField_IdAndValue(fieldId, request.value())) {
+        String value = request.value().trim();
+
+        if (optionRepository.existsByProfileField_IdAndValue(fieldId, value)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Вариант с таким value уже существует.");
         }
 
         ProfileFieldOption option = new ProfileFieldOption();
         option.setProfileField(field);
-        option.setValue(request.value().trim());
+        option.setValue(value);
         option.setLabel(request.label().trim());
         option.setSortOrder(request.sortOrder());
 
@@ -60,13 +63,16 @@ public class ProfileFieldOptionService {
     @Transactional
     public ProfileFieldOptionResponse update(Long fieldId, Long optionId, ProfileFieldOptionRequest request) {
         ProfileFieldOption option = getOption(fieldId, optionId);
+        validateOptionRequest(request);
         validateFieldType(option.getProfileField());
 
-        if (optionRepository.existsByProfileField_IdAndValueAndIdNot(fieldId, request.value(), optionId)) {
+        String value = request.value().trim();
+
+        if (optionRepository.existsByProfileField_IdAndValueAndIdNot(fieldId, value, optionId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Вариант с таким value уже существует.");
         }
 
-        option.setValue(request.value().trim());
+        option.setValue(value);
         option.setLabel(request.label().trim());
         option.setSortOrder(request.sortOrder());
 

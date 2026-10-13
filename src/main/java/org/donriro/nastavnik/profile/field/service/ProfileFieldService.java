@@ -3,16 +3,14 @@ package org.donriro.nastavnik.profile.field.service;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import lombok.RequiredArgsConstructor;
-import org.donriro.nastavnik.profile.field.dto.CreateProfileFieldRequest;
-import org.donriro.nastavnik.profile.field.dto.ProfileFieldResponse;
-import org.donriro.nastavnik.profile.field.dto.ProfileFieldRoleRequest;
-import org.donriro.nastavnik.profile.field.dto.UpdateProfileFieldRequest;
+import org.donriro.nastavnik.profile.field.dto.*;
 import org.donriro.nastavnik.profile.field.entity.ProfileField;
 import org.donriro.nastavnik.profile.field.entity.ProfileFieldRole;
 import org.donriro.nastavnik.profile.field.entity.ProfileFieldRoleId;
 import org.donriro.nastavnik.profile.field.exception.StaleProfileFieldException;
 import org.donriro.nastavnik.profile.field.repository.ProfileFieldRepository;
 import org.donriro.nastavnik.profile.field.repository.ProfileFieldRoleRepository;
+import org.donriro.nastavnik.profile.field.type.ProfileFieldType;
 import org.donriro.nastavnik.user.entity.Role;
 import org.donriro.nastavnik.user.repository.RoleRepository;
 import org.donriro.nastavnik.user.role.RoleCode;
@@ -35,6 +33,7 @@ public class ProfileFieldService {
     private final ProfileFieldRepository profileFieldRepository;
     private final ProfileFieldRoleRepository profileFieldRoleRepository;
     private final RoleRepository roleRepository;
+    private final ProfileFieldOptionService profileFieldOptionService;
 
     private final EntityManager entityManager;
 
@@ -55,6 +54,11 @@ public class ProfileFieldService {
         ProfileField savedField = profileFieldRepository.save(field);
 
         replaceRoles(savedField, request.roles());
+
+        // Для SELECT и MULTISELECT создаём варианты в той же транзакции.
+        if (isChoiceField(savedField.getFieldType())) {
+            profileFieldOptionService.createAllForField(savedField, request.options());
+        }
 
         savedField.setMatchingEnabled(request.matchingEnabled());
 
@@ -242,6 +246,8 @@ public class ProfileFieldService {
                 throw new IllegalArgumentException("Порядок отображения не может быть отрицательным.");
             }
         }
+
+        validateOptions(request.fieldType(), request.options());
     }
 
     private void replaceRoles(ProfileField field, List<ProfileFieldRoleRequest> roleRequests) {
@@ -297,15 +303,61 @@ public class ProfileFieldService {
 
         // Если поле перестало быть назначенным обеим ролям,
         // оно больше не может участвовать в подборе.
-        boolean assignedToMentor =
-                requestedRoleCodes.contains(RoleCode.MENTOR);
-
-        boolean assignedToMentee =
-                requestedRoleCodes.contains(RoleCode.MENTEE);
+        boolean assignedToMentor = requestedRoleCodes.contains(RoleCode.MENTOR);
+        boolean assignedToMentee = requestedRoleCodes.contains(RoleCode.MENTEE);
 
         if (!assignedToMentor || !assignedToMentee) {
             field.setMatchingEnabled(false);
         }
+    }
+
+
+    private void validateOptions(ProfileFieldType fieldType, List<ProfileFieldOptionRequest> options) {
+        boolean choiceField = isChoiceField(fieldType);
+
+        // Для обычных полей варианты не допускаются.
+        if (!choiceField) {
+            if (options != null && !options.isEmpty()) {
+                throw new IllegalArgumentException("Варианты можно указывать только для полей типа SELECT или MULTISELECT.");
+            }
+            return;
+        }
+
+        // Для SELECT и MULTISELECT нужен хотя бы один вариант.
+        if (options == null || options.isEmpty()) {
+            throw new IllegalArgumentException("Для поля типа SELECT или MULTISELECT необходимо указать хотя бы один вариант.");
+        }
+
+        Set<String> values = new HashSet<>();
+
+        for (ProfileFieldOptionRequest option : options) {
+            if (option == null) {
+                throw new IllegalArgumentException("Вариант поля не должен быть null.");
+            }
+
+            if (option.value() == null || option.value().isBlank() || option.value().length() > 255) {
+                throw new IllegalArgumentException("value варианта должен содержать от 1 до 255 символов.");
+            }
+
+            if (option.label() == null || option.label().isBlank() || option.label().length() > 255) {
+                throw new IllegalArgumentException("label варианта должен содержать от 1 до 255 символов.");
+            }
+
+            if (option.sortOrder() < 0) {
+                throw new IllegalArgumentException("Порядок отображения варианта не может быть отрицательным.");
+            }
+
+            // Значения сравниваем после trim().
+            String normalizedValue = option.value().trim();
+
+            if (!values.add(normalizedValue)) {
+                throw new IllegalArgumentException("Варианты одного поля не должны содержать повторяющиеся value: " + normalizedValue);
+            }
+        }
+    }
+
+    private boolean isChoiceField(ProfileFieldType fieldType) {
+        return fieldType == ProfileFieldType.SELECT || fieldType == ProfileFieldType.MULTISELECT;
     }
 
     private ProfileFieldResponse toResponse(ProfileField field) {
@@ -321,6 +373,8 @@ public class ProfileFieldService {
                                 role.getSortOrder()
                         ))
                         .toList();
+
+        List<ProfileFieldOptionResponse> options = isChoiceField(field.getFieldType()) ? profileFieldOptionService.getAll(field.getId()) : List.of();
 
         return new ProfileFieldResponse(
                 field.getId(),
