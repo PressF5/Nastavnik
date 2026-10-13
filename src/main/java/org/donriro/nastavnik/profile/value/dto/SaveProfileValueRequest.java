@@ -10,16 +10,10 @@ public record SaveProfileValueRequest(
 
         @NotNull
         Long profileFieldId,
-
         String valueText,
-
         BigDecimal valueNumber,
-
         Boolean valueBoolean,
-
         LocalDate valueDate,
-
         List<@NotNull Long> optionIds
-
 ) {
 }
