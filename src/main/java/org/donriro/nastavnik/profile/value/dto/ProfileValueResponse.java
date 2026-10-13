@@ -1,4 +1,4 @@
-package org.donriro.nastavnik.profile.field.dto;
+package org.donriro.nastavnik.profile.value.dto;
 
 import org.donriro.nastavnik.profile.field.type.ProfileFieldType;
 

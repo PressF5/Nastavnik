@@ -1,4 +1,4 @@
-package org.donriro.nastavnik.profile.field.repository;
+package org.donriro.nastavnik.profile.value.repository;
 
 import org.donriro.nastavnik.profile.value.entity.ProfileValueOption;
 import org.donriro.nastavnik.profile.value.entity.ProfileValueOptionId;
