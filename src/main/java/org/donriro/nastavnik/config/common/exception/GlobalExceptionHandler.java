@@ -122,7 +122,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ProfileFieldOptionsRequiredException.class)
     public ResponseEntity<ApiError> handleProfileFieldOptionsRequired(ProfileFieldOptionsRequiredException exception) {
-        return buildError(HttpStatus.BAD_REQUEST, ErrorCode.PROFILE_FIELD_TYPE_CHANGE_NOT_ALLOWED, exception.getMessage());
+        return buildError(HttpStatus.BAD_REQUEST, ErrorCode.PROFILE_FIELD_OPTIONS_REQUIRED, exception.getMessage());
     }
 
     @ExceptionHandler({StaleProfileFieldException.class, ObjectOptimisticLockingFailureException.class, OptimisticLockException.class})

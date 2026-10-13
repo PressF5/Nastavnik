@@ -42,7 +42,7 @@ public class ProfileFieldService {
         validateRequest(request);
 
         if (profileFieldRepository.existsByNameIgnoreCase(request.name().trim())) {
-            throw new IllegalArgumentException("Поле с таким названием уже существует.");
+            throw new ProfileFieldAlreadyExistsException("Поле с таким названием уже существует.");
         }
 
         ProfileField field = new ProfileField();
@@ -83,7 +83,7 @@ public class ProfileFieldService {
         }
 
         if (profileFieldRepository.existsByNameIgnoreCaseAndIdNot(request.name().trim(), fieldId)) {
-            throw new IllegalArgumentException("Поле с таким названием уже существует.");
+            throw new ProfileFieldAlreadyExistsException("Поле с таким названием уже существует.");
         }
 
         ProfileFieldType currentType = field.getFieldType();
