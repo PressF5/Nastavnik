@@ -1,4 +1,4 @@
-package org.donriro.nastavnik.profile.field.dto;
+package org.donriro.nastavnik.profile.options.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.PositiveOrZero;

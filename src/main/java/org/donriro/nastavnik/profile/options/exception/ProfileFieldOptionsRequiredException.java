@@ -1,4 +1,4 @@
-package org.donriro.nastavnik.profile.field.exception;
+package org.donriro.nastavnik.profile.options.exception;
 
 public class ProfileFieldOptionsRequiredException extends RuntimeException {
 

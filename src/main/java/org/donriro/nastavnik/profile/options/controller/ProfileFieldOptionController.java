@@ -1,10 +1,10 @@
-package org.donriro.nastavnik.profile.field.controller;
+package org.donriro.nastavnik.profile.options.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.donriro.nastavnik.profile.field.dto.ProfileFieldOptionRequest;
-import org.donriro.nastavnik.profile.field.dto.ProfileFieldOptionResponse;
-import org.donriro.nastavnik.profile.field.service.ProfileFieldOptionService;
+import org.donriro.nastavnik.profile.options.dto.ProfileFieldOptionRequest;
+import org.donriro.nastavnik.profile.options.dto.ProfileFieldOptionResponse;
+import org.donriro.nastavnik.profile.options.service.ProfileFieldOptionService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

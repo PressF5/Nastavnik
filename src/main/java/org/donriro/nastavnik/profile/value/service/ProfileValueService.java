@@ -1,14 +1,18 @@
 package org.donriro.nastavnik.profile.value.service;
 
 import lombok.RequiredArgsConstructor;
+import org.donriro.nastavnik.profile.field.dto.ProfileFieldResponse;
 import org.donriro.nastavnik.profile.field.entity.ProfileField;
-import org.donriro.nastavnik.profile.field.entity.ProfileFieldOption;
+import org.donriro.nastavnik.profile.field.service.ProfileFieldService;
+import org.donriro.nastavnik.profile.options.entity.ProfileFieldOption;
 import org.donriro.nastavnik.profile.field.entity.ProfileFieldRole;
-import org.donriro.nastavnik.profile.field.repository.ProfileFieldOptionRepository;
+import org.donriro.nastavnik.profile.options.repository.ProfileFieldOptionRepository;
 import org.donriro.nastavnik.profile.field.repository.ProfileFieldRepository;
 import org.donriro.nastavnik.profile.field.repository.ProfileFieldRoleRepository;
 import org.donriro.nastavnik.profile.field.type.ProfileFieldType;
+import org.donriro.nastavnik.profile.value.dto.ProfileFormFieldResponse;
 import org.donriro.nastavnik.profile.value.dto.ProfileValueResponse;
+import org.donriro.nastavnik.profile.value.dto.SaveProfileFormRequest;
 import org.donriro.nastavnik.profile.value.dto.SaveProfileValueRequest;
 import org.donriro.nastavnik.profile.value.entity.ProfileValue;
 import org.donriro.nastavnik.profile.value.entity.ProfileValueOption;
@@ -26,6 +30,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -38,6 +44,7 @@ public class ProfileValueService {
     private final ProfileFieldRoleRepository profileFieldRoleRepository;
     private final ProfileFieldOptionRepository profileFieldOptionRepository;
     private final UserRepository userRepository;
+    private final ProfileFieldService profileFieldService;
 
     @Transactional
     public ProfileValueResponse saveForCurrentUser(SaveProfileValueRequest request) {
@@ -47,12 +54,12 @@ public class ProfileValueService {
 
         User user = getCurrentUserFromDatabase();
 
-        ProfileField field = profileFieldRepository.findById(request.profileFieldId())
+        ProfileField field = profileFieldRepository
+                .findById(request.profileFieldId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Поле анкеты не найдено."));
 
         if (!field.isActive()) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT, "Нельзя заполнять неактивное поле анкеты.");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Нельзя заполнять неактивное поле анкеты.");
         }
 
         ProfileFieldRole assignment = profileFieldRoleRepository
@@ -60,14 +67,68 @@ public class ProfileValueService {
                 .stream()
                 .filter(item -> item.getRole().getCode() == user.getRole().getCode())
                 .findFirst()
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.FORBIDDEN,
-                        "Это поле не назначено вашей роли."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Это поле не назначено вашей роли."));
+
+        return saveValue(user, request, assignment);
+    }
+
+    @Transactional
+    public List<ProfileValueResponse> saveFormForCurrentUser(SaveProfileFormRequest request) {
+        if (request == null || request.values() == null || request.values().isEmpty()) {
+            throw badRequest("Необходимо передать поля анкеты.");
+        }
+
+        User user = getCurrentUserFromDatabase();
+
+        List<ProfileFieldRole> assignments = profileFieldRoleRepository
+                        .findAllByRole_CodeAndProfileField_ActiveTrueOrderBySortOrderAsc(user.getRole().getCode());
+
+        Map<Long, ProfileFieldRole> assignmentsByFieldId =
+                assignments.stream()
+                        .collect(Collectors.toMap(assignment -> assignment.getProfileField().getId(), Function.identity()));
+
+        // Проверяем структуру запроса и дубликаты ID.
+        Set<Long> submittedIds = new HashSet<>();
+
+        for (SaveProfileValueRequest value : request.values()) {
+            if (value == null || value.profileFieldId() == null) {
+                throw badRequest("Каждое значение должно содержать profileFieldId.");
+            }
+
+            if (!submittedIds.add(value.profileFieldId())) {
+                throw badRequest("Поле анкеты передано несколько раз: " + value.profileFieldId());
+            }
+
+            if (!assignmentsByFieldId.containsKey(value.profileFieldId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Поле не назначено вашей роли или неактивно: " + value.profileFieldId());
+            }
+        }
+
+        // Проверяем, что переданы все активные поля текущей роли.
+        Set<Long> missingIds = new HashSet<>(assignmentsByFieldId.keySet());
+        missingIds.removeAll(submittedIds);
+
+        if (!missingIds.isEmpty()) {
+            throw badRequest("Не переданы поля анкеты: " + missingIds);
+        }
+
+        // Сохраняем в порядке полей, заданном для роли.
+        Map<Long, SaveProfileValueRequest> requestsByFieldId =
+                request.values()
+                        .stream()
+                        .collect(Collectors.toMap(SaveProfileValueRequest::profileFieldId, Function.identity()));
+
+        return assignments.stream()
+                .map(assignment -> saveValue(user, requestsByFieldId.get(assignment.getProfileField().getId()), assignment))
+                .toList();
+    }
+
+    private ProfileValueResponse saveValue(User user, SaveProfileValueRequest request, ProfileFieldRole assignment) {
+        ProfileField field = assignment.getProfileField();
 
         validateValue(request, field.getFieldType(), assignment.isRequired());
 
-        List<ProfileFieldOption> selectedOptions =
-                resolveOptions(request.optionIds(), field);
+        List<ProfileFieldOption> selectedOptions = resolveOptions(request.optionIds(), field);
 
         ProfileValue value = profileValueRepository
                 .findByUser_IdAndProfileField_Id(user.getId(), field.getId())
@@ -79,11 +140,9 @@ public class ProfileValueService {
         value.setValueNumber(request.valueNumber());
         value.setValueBoolean(request.valueBoolean());
         value.setValueDate(request.valueDate());
-
         value = profileValueRepository.saveAndFlush(value);
 
-        // Сначала удаляем прежний выбор, затем записываем новый.
-        // Всё выполняется в одной транзакции.
+        // Заменяем прежние варианты выбора.
         profileValueOptionRepository.deleteAllByProfileValue_Id(value.getId());
         profileValueOptionRepository.flush();
 
@@ -127,6 +186,22 @@ public class ProfileValueService {
 
                     return toResponse(value, selectedOptions);
                 })
+                .toList();
+    }
+
+    public List<ProfileFormFieldResponse> getMyFormWithValues() {
+        List<ProfileFieldResponse> fields = profileFieldService.getMyForm();
+
+        Map<Long, ProfileValueResponse> savedValues =
+                getAllForCurrentUser()
+                        .stream()
+                        .collect(Collectors.toMap(
+                                ProfileValueResponse::profileFieldId,
+                                Function.identity()
+                        ));
+
+        return fields.stream()
+                .map(field -> new ProfileFormFieldResponse(field, savedValues.get(field.id())))
                 .toList();
     }
 

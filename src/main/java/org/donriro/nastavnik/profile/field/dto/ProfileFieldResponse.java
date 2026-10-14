@@ -1,6 +1,7 @@
 package org.donriro.nastavnik.profile.field.dto;
 
 import org.donriro.nastavnik.profile.field.type.ProfileFieldType;
+import org.donriro.nastavnik.profile.options.dto.ProfileFieldOptionResponse;
 import org.donriro.nastavnik.user.role.RoleCode;
 
 import java.util.List;

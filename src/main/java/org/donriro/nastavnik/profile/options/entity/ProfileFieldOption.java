@@ -1,10 +1,11 @@
-package org.donriro.nastavnik.profile.field.entity;
+package org.donriro.nastavnik.profile.options.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.donriro.nastavnik.config.common.persistence.BaseEntity;
+import org.donriro.nastavnik.profile.field.entity.ProfileField;
 
 @Entity
 @Table(name = "profile_field_option")

@@ -52,4 +52,9 @@ public class ProfileFieldController {
         profileFieldService.deactivate(id);
         return ResponseEntity.noContent().build();
     }
+
+    @GetMapping("/my-form")
+    public ResponseEntity<List<ProfileFieldResponse>> getMyForm() {
+        return ResponseEntity.ok(profileFieldService.getMyForm());
+    }
 }

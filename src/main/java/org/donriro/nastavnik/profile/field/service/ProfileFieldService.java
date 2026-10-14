@@ -11,10 +11,17 @@ import org.donriro.nastavnik.profile.field.exception.*;
 import org.donriro.nastavnik.profile.field.repository.ProfileFieldRepository;
 import org.donriro.nastavnik.profile.field.repository.ProfileFieldRoleRepository;
 import org.donriro.nastavnik.profile.field.type.ProfileFieldType;
+import org.donriro.nastavnik.profile.options.dto.ProfileFieldOptionRequest;
+import org.donriro.nastavnik.profile.options.dto.ProfileFieldOptionResponse;
+import org.donriro.nastavnik.profile.options.exception.ProfileFieldOptionsRequiredException;
+import org.donriro.nastavnik.profile.options.service.ProfileFieldOptionService;
 import org.donriro.nastavnik.user.entity.Role;
 import org.donriro.nastavnik.user.repository.RoleRepository;
 import org.donriro.nastavnik.user.role.RoleCode;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -166,6 +173,62 @@ public class ProfileFieldService {
                 .stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    public List<ProfileFieldResponse> getMyForm() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Пользователь не аутентифицирован.");
+        }
+
+        Set<String> authorities = authentication.getAuthorities()
+                .stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toSet());
+
+        RoleCode roleCode;
+
+        if (authorities.contains("ROLE_MENTOR")) {
+            roleCode = RoleCode.MENTOR;
+        } else if (authorities.contains("ROLE_MENTEE")) {
+            roleCode = RoleCode.MENTEE;
+        } else {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Форма профиля доступна только наставнику и наставляемому.");
+        }
+
+        return profileFieldRoleRepository
+                .findAllByRole_CodeAndProfileField_ActiveTrueOrderBySortOrderAsc(
+                        roleCode
+                )
+                .stream()
+                .map(assignment -> toFormResponse(assignment.getProfileField(), assignment))
+                .toList();
+    }
+
+    private ProfileFieldResponse toFormResponse(ProfileField field, ProfileFieldRole assignment) {
+        List<ProfileFieldResponse.ProfileFieldRoleResponse> roles =
+                List.of(
+                        new ProfileFieldResponse.ProfileFieldRoleResponse(
+                                assignment.getRole().getCode(),
+                                assignment.isRequired(),
+                                assignment.getSortOrder()
+                        )
+                );
+
+        List<ProfileFieldOptionResponse> options =
+                isChoiceField(field.getFieldType()) ? profileFieldOptionService.getActiveOptions(field.getId()) : List.of();
+        return new ProfileFieldResponse(
+                field.getId(),
+                field.getVersion(),
+                field.getName(),
+                field.getFieldType(),
+                field.isSearchable(),
+                field.isActive(),
+                field.isMatchingEnabled(),
+                roles,
+                options
+        );
     }
 
     private void validateUpdateRequest(UpdateProfileFieldRequest request) {

@@ -1,11 +1,11 @@
-package org.donriro.nastavnik.profile.field.service;
+package org.donriro.nastavnik.profile.options.service;
 
 import lombok.RequiredArgsConstructor;
-import org.donriro.nastavnik.profile.field.dto.ProfileFieldOptionRequest;
-import org.donriro.nastavnik.profile.field.dto.ProfileFieldOptionResponse;
+import org.donriro.nastavnik.profile.options.dto.ProfileFieldOptionRequest;
+import org.donriro.nastavnik.profile.options.dto.ProfileFieldOptionResponse;
 import org.donriro.nastavnik.profile.field.entity.ProfileField;
-import org.donriro.nastavnik.profile.field.entity.ProfileFieldOption;
-import org.donriro.nastavnik.profile.field.repository.ProfileFieldOptionRepository;
+import org.donriro.nastavnik.profile.options.entity.ProfileFieldOption;
+import org.donriro.nastavnik.profile.options.repository.ProfileFieldOptionRepository;
 import org.donriro.nastavnik.profile.field.repository.ProfileFieldRepository;
 import org.donriro.nastavnik.profile.field.type.ProfileFieldType;
 import org.springframework.http.HttpStatus;

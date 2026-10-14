@@ -1,6 +1,6 @@
-package org.donriro.nastavnik.profile.field.repository;
+package org.donriro.nastavnik.profile.options.repository;
 
-import org.donriro.nastavnik.profile.field.entity.ProfileFieldOption;
+import org.donriro.nastavnik.profile.options.entity.ProfileFieldOption;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

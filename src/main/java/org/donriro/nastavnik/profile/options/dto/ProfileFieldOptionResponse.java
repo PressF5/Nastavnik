@@ -1,4 +1,4 @@
-package org.donriro.nastavnik.profile.field.dto;
+package org.donriro.nastavnik.profile.options.dto;
 
 public record ProfileFieldOptionResponse(
         Long id,

@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.donriro.nastavnik.profile.field.type.ProfileFieldType;
+import org.donriro.nastavnik.profile.options.dto.ProfileFieldOptionRequest;
 
 import java.util.List;
 

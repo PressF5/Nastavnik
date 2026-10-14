@@ -2,6 +2,7 @@ package org.donriro.nastavnik.config.common.exception;
 
 import jakarta.persistence.OptimisticLockException;
 import org.donriro.nastavnik.profile.field.exception.*;
+import org.donriro.nastavnik.profile.options.exception.ProfileFieldOptionsRequiredException;
 import org.donriro.nastavnik.security.exception.InvalidRefreshTokenException;
 import org.donriro.nastavnik.user.exception.*;
 import org.hibernate.exception.ConstraintViolationException;

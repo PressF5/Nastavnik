@@ -5,7 +5,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.donriro.nastavnik.profile.field.entity.ProfileField;
-import org.donriro.nastavnik.profile.field.entity.ProfileFieldOption;
+import org.donriro.nastavnik.profile.options.entity.ProfileFieldOption;
 
 @Entity
 @Table(name = "profile_value_option")
