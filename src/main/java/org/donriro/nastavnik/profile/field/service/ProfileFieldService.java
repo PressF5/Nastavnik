@@ -3,6 +3,7 @@ package org.donriro.nastavnik.profile.field.service;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import lombok.RequiredArgsConstructor;
+import org.donriro.nastavnik.matching.repository.ProfileMatchingRuleRepository;
 import org.donriro.nastavnik.profile.field.dto.*;
 import org.donriro.nastavnik.profile.field.entity.ProfileField;
 import org.donriro.nastavnik.profile.field.entity.ProfileFieldRole;
@@ -41,6 +42,7 @@ public class ProfileFieldService {
     private final ProfileFieldRoleRepository profileFieldRoleRepository;
     private final RoleRepository roleRepository;
     private final ProfileFieldOptionService profileFieldOptionService;
+    private final ProfileMatchingRuleRepository profileMatchingRuleRepository;
 
     private final EntityManager entityManager;
 
@@ -121,6 +123,10 @@ public class ProfileFieldService {
                 .containsAll(Set.of(RoleCode.MENTOR, RoleCode.MENTEE));
 
         field.setMatchingEnabled(request.matchingEnabled() && assignedToBoth);
+        // Если поле больше не участвует в подборе,деактивируем связанное правило.
+        if (!field.isMatchingEnabled()) {
+            deactivateMatchingRule(field.getId());
+        }
 
         /*
          * Назначения profile_field_role тоже должны учитываться
@@ -148,6 +154,9 @@ public class ProfileFieldService {
 
         field.setActive(false);
         field.setMatchingEnabled(false);
+
+        // Не оставляем активное правило для неактивного поля.
+        deactivateMatchingRule(field.getId());
     }
 
     @Transactional
@@ -390,6 +399,11 @@ public class ProfileFieldService {
         }
     }
 
+    private void deactivateMatchingRule(Long profileFieldId) {
+        profileMatchingRuleRepository
+                .findByProfileField_Id(profileFieldId)
+                .ifPresent(rule -> rule.setActive(false));
+    }
 
     private void validateOptions(ProfileFieldType fieldType, List<ProfileFieldOptionRequest> options) {
         boolean choiceField = isChoiceField(fieldType);

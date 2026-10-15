@@ -11,6 +11,7 @@ import org.donriro.nastavnik.matching.exception.ProfileMatchingRuleNotFoundExcep
 import org.donriro.nastavnik.matching.repository.ProfileMatchingRuleRepository;
 import org.donriro.nastavnik.matching.type.ComparisonType;
 import org.donriro.nastavnik.profile.field.entity.ProfileField;
+import org.donriro.nastavnik.profile.field.exception.ProfileFieldNotFoundException;
 import org.donriro.nastavnik.profile.field.repository.ProfileFieldRepository;
 import org.donriro.nastavnik.profile.field.repository.ProfileFieldRoleRepository;
 import org.donriro.nastavnik.profile.field.type.ProfileFieldType;
@@ -37,7 +38,7 @@ public class ProfileMatchingRuleService {
 
         ProfileField field = profileFieldRepository
                 .findById(request.profileFieldId())
-                .orElseThrow(() -> new InvalidProfileMatchingRuleException("Поле анкеты с id=" + request.profileFieldId() + " не найдено."));
+                .orElseThrow(() -> new ProfileFieldNotFoundException("Поле анкеты с id=" + request.profileFieldId() + " не найдено."));
 
         validateField(field, request.comparisonType());
 
@@ -55,22 +56,18 @@ public class ProfileMatchingRuleService {
     }
 
 
+
     @Transactional
     public ProfileMatchingRuleResponse update(Long id, UpdateProfileMatchingRuleRequest request) {
         ProfileMatchingRule rule = ruleRepository.findById(id)
-                .orElseThrow(() -> new ProfileMatchingRuleNotFoundException("Правило подбора с id " + id + " не найдено"));
-
+                .orElseThrow(() -> new ProfileMatchingRuleNotFoundException("Правило подбора с id " + id + " не найдено."));
         ProfileField field = rule.getProfileField();
 
-        // При включении правила проверяем, можно ли использовать поле в подборе.
+        // При включении правила проверяем поле и тип сравнения.
+        // При отключении правило должно отключаться даже тогда,
+        // когда поле уже деактивировано или исключено из подбора.
         if (request.active()) {
             validateField(field, request.comparisonType());
-        } else {
-            // При отключении проверяем совместимость типа только тогда,
-            // когда правило продолжает быть активным.
-            if (rule.isActive()) {
-                validateComparisonType(field, request.comparisonType());
-            }
         }
 
         rule.setComparisonType(request.comparisonType());
@@ -79,6 +76,7 @@ public class ProfileMatchingRuleService {
 
         return toResponse(ruleRepository.save(rule));
     }
+
 
 
     public ProfileMatchingRuleResponse getById(Long ruleId) {

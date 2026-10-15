@@ -1,6 +1,9 @@
 package org.donriro.nastavnik.config.common.exception;
 
 import jakarta.persistence.OptimisticLockException;
+import org.donriro.nastavnik.matching.exception.InvalidProfileMatchingRuleException;
+import org.donriro.nastavnik.matching.exception.ProfileMatchingRuleAlreadyExistsException;
+import org.donriro.nastavnik.matching.exception.ProfileMatchingRuleNotFoundException;
 import org.donriro.nastavnik.profile.field.exception.*;
 import org.donriro.nastavnik.profile.options.exception.ProfileFieldOptionsRequiredException;
 import org.donriro.nastavnik.security.exception.InvalidRefreshTokenException;
@@ -124,6 +127,21 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ProfileFieldOptionsRequiredException.class)
     public ResponseEntity<ApiError> handleProfileFieldOptionsRequired(ProfileFieldOptionsRequiredException exception) {
         return buildError(HttpStatus.BAD_REQUEST, ErrorCode.PROFILE_FIELD_OPTIONS_REQUIRED, exception.getMessage());
+    }
+
+    @ExceptionHandler(InvalidProfileMatchingRuleException.class)
+    public ResponseEntity<ApiError> handleInvalidProfileMatchingRule(InvalidProfileMatchingRuleException exception) {
+        return buildError(HttpStatus.BAD_REQUEST, ErrorCode.INVALID_PROFILE_MATCHING_RULE, exception.getMessage());
+    }
+
+    @ExceptionHandler(ProfileMatchingRuleAlreadyExistsException.class)
+    public ResponseEntity<ApiError> handleProfileMatchingRuleAlreadyExists(ProfileMatchingRuleAlreadyExistsException exception) {
+        return buildError(HttpStatus.CONFLICT, ErrorCode.PROFILE_MATCHING_RULE_ALREADY_EXISTS, exception.getMessage());
+    }
+
+    @ExceptionHandler(ProfileMatchingRuleNotFoundException.class)
+    public ResponseEntity<ApiError> handleProfileMatchingRuleNotFound(ProfileMatchingRuleNotFoundException exception) {
+        return buildError(HttpStatus.NOT_FOUND, ErrorCode.PROFILE_MATCHING_RULE_NOT_FOUND, exception.getMessage());
     }
 
     @ExceptionHandler({StaleProfileFieldException.class, ObjectOptimisticLockingFailureException.class, OptimisticLockException.class})
