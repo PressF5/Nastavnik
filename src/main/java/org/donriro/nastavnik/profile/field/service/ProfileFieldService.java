@@ -20,6 +20,7 @@ import org.donriro.nastavnik.user.entity.Role;
 import org.donriro.nastavnik.user.repository.RoleRepository;
 import org.donriro.nastavnik.user.role.RoleCode;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -69,7 +70,12 @@ public class ProfileFieldService {
             profileFieldOptionService.createAllForField(savedField, request.options());
         }
 
-        savedField.setMatchingEnabled(request.matchingEnabled());
+        boolean assignedToBothRoles = request.roles().stream()
+                .map(ProfileFieldRoleRequest::roleCode)
+                .collect(Collectors.toSet())
+                .containsAll(Set.of(RoleCode.MENTOR, RoleCode.MENTEE));
+
+        savedField.setMatchingEnabled(request.matchingEnabled() && assignedToBothRoles);
 
         return toResponse(savedField);
     }
@@ -184,10 +190,11 @@ public class ProfileFieldService {
                 .toList();
     }
 
+
     public List<ProfileFieldResponse> getMyForm() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-        if (authentication == null || !authentication.isAuthenticated()) {
+        if (authentication == null || !authentication.isAuthenticated() || authentication instanceof AnonymousAuthenticationToken) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Пользователь не аутентифицирован.");
         }
 
@@ -196,20 +203,17 @@ public class ProfileFieldService {
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.toSet());
 
-        RoleCode roleCode;
+        boolean isMentor = authorities.contains("ROLE_MENTOR");
+        boolean isMentee = authorities.contains("ROLE_MENTEE");
 
-        if (authorities.contains("ROLE_MENTOR")) {
-            roleCode = RoleCode.MENTOR;
-        } else if (authorities.contains("ROLE_MENTEE")) {
-            roleCode = RoleCode.MENTEE;
-        } else {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Форма профиля доступна только наставнику и наставляемому.");
+        if (isMentor == isMentee) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Для получения формы должна быть назначена ровно одна роль: MENTOR или MENTEE.");
         }
 
+        RoleCode roleCode = isMentor ? RoleCode.MENTOR : RoleCode.MENTEE;
+
         return profileFieldRoleRepository
-                .findAllByRole_CodeAndProfileField_ActiveTrueOrderBySortOrderAsc(
-                        roleCode
-                )
+                .findAllByRole_CodeAndProfileField_ActiveTrueOrderBySortOrderAsc(roleCode)
                 .stream()
                 .map(assignment -> toFormResponse(assignment.getProfileField(), assignment))
                 .toList();

@@ -8,6 +8,7 @@ import org.donriro.nastavnik.profile.field.dto.UpdateProfileFieldRequest;
 import org.donriro.nastavnik.profile.field.service.ProfileFieldService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -29,24 +30,28 @@ public class ProfileFieldController {
         return ResponseEntity.ok(response);
     }
 
+    @PreAuthorize("hasRole('REGION_ADMIN')")
     @PostMapping
     public ResponseEntity<ProfileFieldResponse> create(@Valid @RequestBody CreateProfileFieldRequest request) {
         ProfileFieldResponse response = profileFieldService.create(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @PreAuthorize("hasRole('REGION_ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<ProfileFieldResponse> update(@PathVariable Long id, @Valid @RequestBody UpdateProfileFieldRequest request) {
         ProfileFieldResponse response = profileFieldService.update(id, request);
         return ResponseEntity.ok(response);
     }
 
+    @PreAuthorize("hasRole('REGION_ADMIN')")
     @PatchMapping("/{id}/activate")
     public ResponseEntity<Void> activate(@PathVariable Long id) {
         profileFieldService.activate(id);
         return ResponseEntity.noContent().build();
     }
 
+    @PreAuthorize("hasRole('REGION_ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deactivate(@PathVariable Long id) {
         profileFieldService.deactivate(id);
