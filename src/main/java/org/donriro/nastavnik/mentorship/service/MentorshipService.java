@@ -55,7 +55,12 @@ public class MentorshipService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "У администратора не настроена организационная принадлежность.");
         }
 
-        User mentee = getUser(request.menteeId());
+        // Блокируем запись наставляемого до завершения транзакции.
+        // Параллельные запросы на создание заявок для этого пользователя
+        // будут выполняться последовательно.
+        User mentee = userRepository
+                .findByIdForUpdate(request.menteeId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Наставляемый не найден."));
         User mentor = getUser(request.mentorId());
 
         requireRole(mentee, RoleCode.MENTEE);
@@ -128,6 +133,7 @@ public class MentorshipService {
     /**
      * Наставник принимает или отклоняет заявку.
      */
+
     @Transactional
     public MentorshipResponse decide(Long mentorshipId, MentorshipDecisionRequest request) {
         User mentor = getCurrentUser();
@@ -135,15 +141,25 @@ public class MentorshipService {
         requireRole(mentor, RoleCode.MENTOR);
         requireActiveAccount(mentor);
 
+        // При принятии заявки блокируем строку наставника
+        // до загрузки заявки и проверки её статуса.
+        // Это сериализует подтверждения заявок одного наставника.
+        if (request.decision() == MentorshipDecision.ACCEPT) {
+            mentor = userRepository.findByIdForUpdate(mentor.getId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Наставник не найден."));
+            requireActiveAccount(mentor);
+        }
+
         Mentorship mentorship = mentorshipRepository
                 .findById(mentorshipId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Заявка на наставничество не найдена."));
 
-        // Нельзя обрабатывать чужие заявки.
+        // Наставник может обрабатывать только адресованные ему заявки.
         if (!mentorship.getMentor().getId().equals(mentor.getId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Эта заявка адресована другому наставнику.");
         }
 
+        // После получения блокировки проверяем актуальный статус заявки.
         if (mentorship.getStatus() != MentorshipStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Заявка уже обработана.");
         }
@@ -152,23 +168,13 @@ public class MentorshipService {
 
         if (request.decision() == MentorshipDecision.ACCEPT) {
 
-            // Блокируем запись наставника, чтобы параллельные
-            // запросы не могли превысить лимит назначений.
-            User lockedMentor = userRepository
-                    .findByIdForUpdate(mentor.getId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Наставник не найден."));
-
-            requireActiveAccount(lockedMentor);
-
-            // Дополнительная проверка: наставляемый не должен
-            // иметь другого действующего наставника.
+            // У наставляемого может быть только один действующий наставник.
             if (mentorshipRepository.existsByMentee_IdAndStatusIn(mentorship.getMentee().getId(), List.of(MentorshipStatus.ACCEPTED))) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "У наставляемого уже есть действующий наставник.");
             }
 
-            // Учитываем только подтверждённые назначения.
-            long activeMentees = mentorshipRepository
-                    .countByMentor_IdAndStatus(lockedMentor.getId(), MentorshipStatus.ACCEPTED);
+            // Считаем действующие назначения после получения блокировки.
+            long activeMentees = mentorshipRepository.countByMentor_IdAndStatus(mentor.getId(), MentorshipStatus.ACCEPTED);
 
             if (activeMentees >= 3) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Наставник уже имеет трёх действующих наставляемых.");
@@ -179,6 +185,7 @@ public class MentorshipService {
             mentorship.setEndedAt(null);
 
         } else if (request.decision() == MentorshipDecision.REJECT) {
+
             mentorship.setStatus(MentorshipStatus.REJECTED);
             mentorship.setStartedAt(null);
             mentorship.setEndedAt(null);
@@ -188,8 +195,8 @@ public class MentorshipService {
         }
 
         Mentorship saved = mentorshipRepository.save(mentorship);
-        writeAudit(saved, mentor, request.decision() == MentorshipDecision.ACCEPT ? "REQUEST_ACCEPTED" : "REQUEST_REJECTED", oldStatus, saved.getStatus(), request.comment());
 
+        writeAudit(saved, mentor, request.decision() == MentorshipDecision.ACCEPT ? "REQUEST_ACCEPTED" : "REQUEST_REJECTED", oldStatus, saved.getStatus(), request.comment());
         return toResponse(saved);
     }
 
