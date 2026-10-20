@@ -1,4 +1,3 @@
---liquibase formatted sql
 --changeset nastavnik:018-create-unique-partial-indexes
 -- Только один активный учебный год.
 CREATE UNIQUE INDEX uk_academic_year_one_active ON academic_year (active) WHERE active = TRUE;
