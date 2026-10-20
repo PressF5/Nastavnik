@@ -123,6 +123,22 @@ public class ProfileValueService {
                 .toList();
     }
 
+    public List<ProfileValueResponse> getAllForUser(Long userId) {
+        return profileValueRepository.findAllByUser_Id(userId)
+                .stream()
+                .map(value -> {
+                    List<ProfileFieldOption> selectedOptions =
+                            profileValueOptionRepository
+                                    .findAllByProfileValue_Id(value.getId())
+                                    .stream()
+                                    .map(ProfileValueOption::getProfileOption)
+                                    .toList();
+
+                    return toResponse(value, selectedOptions);
+                })
+                .toList();
+    }
+
     private ProfileValueResponse saveValue(User user, SaveProfileValueRequest request, ProfileFieldRole assignment) {
         ProfileField field = assignment.getProfileField();
 

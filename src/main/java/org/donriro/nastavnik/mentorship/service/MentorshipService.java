@@ -2,9 +2,7 @@ package org.donriro.nastavnik.mentorship.service;
 
 import lombok.RequiredArgsConstructor;
 import org.donriro.nastavnik.matching.service.ProfileCompatibilityCalculator;
-import org.donriro.nastavnik.mentorship.dto.CreateMentorshipRequest;
-import org.donriro.nastavnik.mentorship.dto.MentorshipDecisionRequest;
-import org.donriro.nastavnik.mentorship.dto.MentorshipResponse;
+import org.donriro.nastavnik.mentorship.dto.*;
 import org.donriro.nastavnik.mentorship.entity.AcademicYear;
 import org.donriro.nastavnik.mentorship.entity.Mentorship;
 import org.donriro.nastavnik.mentorship.entity.MentorshipAuditLog;
@@ -13,6 +11,7 @@ import org.donriro.nastavnik.mentorship.repository.MentorshipAuditLogRepository;
 import org.donriro.nastavnik.mentorship.repository.MentorshipRepository;
 import org.donriro.nastavnik.mentorship.status.MentorshipDecision;
 import org.donriro.nastavnik.mentorship.status.MentorshipStatus;
+import org.donriro.nastavnik.profile.value.service.ProfileValueService;
 import org.donriro.nastavnik.security.principal.CustomUserDetails;
 import org.donriro.nastavnik.user.entity.User;
 import org.donriro.nastavnik.user.repository.UserRepository;
@@ -40,6 +39,7 @@ public class MentorshipService {
     private final MentorshipAuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
     private final ProfileCompatibilityCalculator compatibilityCalculator;
+    private final ProfileValueService profileValueService;
 
     /**
      * Администратор ОО создаёт предварительную заявку
@@ -131,24 +131,43 @@ public class MentorshipService {
     }
 
     /**
-     * Наставник принимает или отклоняет заявку.
+     * Возвращает список действующих наставляемых
+     * текущего наставника.
      */
-
-    @Transactional
-    public MentorshipResponse decide(Long mentorshipId, MentorshipDecisionRequest request) {
+    public List<MentorshipResponse> getCurrentMentorMentees() {
         User mentor = getCurrentUser();
 
         requireRole(mentor, RoleCode.MENTOR);
         requireActiveAccount(mentor);
 
-        // При принятии заявки блокируем строку наставника
-        // до загрузки заявки и проверки её статуса.
-        // Это сериализует подтверждения заявок одного наставника.
-        if (request.decision() == MentorshipDecision.ACCEPT) {
-            mentor = userRepository.findByIdForUpdate(mentor.getId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Наставник не найден."));
-            requireActiveAccount(mentor);
-        }
+        return mentorshipRepository
+                .findAllByMentor_IdAndStatusOrderByStartedAtDesc(mentor.getId(), MentorshipStatus.ACCEPTED)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    /**
+     * Наставник принимает или отклоняет заявку.
+     */
+    @Transactional
+    public MentorshipResponse decide(Long mentorshipId, MentorshipDecisionRequest request) {
+        User currentMentor = getCurrentUser();
+
+        requireRole(currentMentor, RoleCode.MENTOR);
+        requireActiveAccount(currentMentor);
+
+        Long mentorId = currentMentor.getId();
+
+        // Блокируем запись наставника до завершения транзакции.
+        // Все решения по его заявкам будут последовательно проверять
+        // актуальное состояние связей наставничества.
+        User mentor = userRepository
+                .findByIdForUpdate(mentorId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Наставник не найден."));
+
+        requireRole(mentor, RoleCode.MENTOR);
+        requireActiveAccount(mentor);
 
         Mentorship mentorship = mentorshipRepository
                 .findById(mentorshipId)
@@ -167,14 +186,15 @@ public class MentorshipService {
         MentorshipStatus oldStatus = mentorship.getStatus();
 
         if (request.decision() == MentorshipDecision.ACCEPT) {
-
             // У наставляемого может быть только один действующий наставник.
             if (mentorshipRepository.existsByMentee_IdAndStatusIn(mentorship.getMentee().getId(), List.of(MentorshipStatus.ACCEPTED))) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "У наставляемого уже есть действующий наставник.");
             }
 
-            // Считаем действующие назначения после получения блокировки.
-            long activeMentees = mentorshipRepository.countByMentor_IdAndStatus(mentor.getId(), MentorshipStatus.ACCEPTED);
+            // Ограничиваем только подтверждённые назначения.
+            // Ожидающие заявки в лимит не входят.
+            long activeMentees =
+                    mentorshipRepository.countByMentor_IdAndStatus(mentor.getId(), MentorshipStatus.ACCEPTED);
 
             if (activeMentees >= 3) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Наставник уже имеет трёх действующих наставляемых.");
@@ -195,8 +215,87 @@ public class MentorshipService {
         }
 
         Mentorship saved = mentorshipRepository.save(mentorship);
-
         writeAudit(saved, mentor, request.decision() == MentorshipDecision.ACCEPT ? "REQUEST_ACCEPTED" : "REQUEST_REJECTED", oldStatus, saved.getStatus(), request.comment());
+        return toResponse(saved);
+    }
+
+    /**
+     * Возвращает карточку наставляемого,
+     * с которым у текущего наставника есть действующее назначение.
+     */
+    public MenteeProfileResponse getMenteeProfile(Long menteeId) {
+        User mentor = getCurrentUser();
+
+        requireRole(mentor, RoleCode.MENTOR);
+        requireActiveAccount(mentor);
+
+        Mentorship mentorship = mentorshipRepository
+                .findAllByMentor_IdAndStatusOrderByStartedAtDesc(mentor.getId(), MentorshipStatus.ACCEPTED)
+                .stream()
+                .filter(item -> item.getMentee().getId().equals(menteeId))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Действующий наставляемый не найден."));
+
+        User mentee = mentorship.getMentee();
+
+        return new MenteeProfileResponse(
+                mentee.getId(),
+                mentee.getFirstName(),
+                mentee.getLastName(),
+                mentee.getMiddleName(),
+                mentee.getBirthDate(),
+                mentee.getMsu() != null
+                        ? mentee.getMsu().getName()
+                        : null,
+                mentee.getEducationalOrganization() != null
+                        ? mentee.getEducationalOrganization().getName()
+                        : null,
+                toResponse(mentorship),
+                profileValueService.getAllForUser(mentee.getId())
+        );
+    }
+
+    /**
+     * Завершает действующее наставничество.
+     */
+    @Transactional
+    public MentorshipResponse endMentorship(Long mentorshipId, EndMentorshipRequest request) {
+        User currentMentor = getCurrentUser();
+
+        requireRole(currentMentor, RoleCode.MENTOR);
+        requireActiveAccount(currentMentor);
+
+        // Блокируем запись наставника на время операции.
+        User mentor = userRepository
+                .findByIdForUpdate(currentMentor.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Наставник не найден."));
+
+        requireActiveAccount(mentor);
+
+        Mentorship mentorship = mentorshipRepository
+                .findByIdAndMentor_Id(mentorshipId, mentor.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Назначение наставничества не найдено."));
+
+        if (mentorship.getStatus() != MentorshipStatus.ACCEPTED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Завершить можно только действующее наставничество.");
+        }
+
+        MentorshipStatus oldStatus = mentorship.getStatus();
+
+        mentorship.setStatus(MentorshipStatus.ENDED);
+        mentorship.setEndedAt(Instant.now());
+
+        Mentorship saved = mentorshipRepository.save(mentorship);
+
+        writeAudit(
+                saved,
+                mentor,
+                "MENTORSHIP_ENDED",
+                oldStatus,
+                saved.getStatus(),
+                request.reason().trim()
+        );
+
         return toResponse(saved);
     }
 

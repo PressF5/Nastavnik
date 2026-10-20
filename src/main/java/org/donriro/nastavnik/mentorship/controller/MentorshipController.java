@@ -2,9 +2,7 @@ package org.donriro.nastavnik.mentorship.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.donriro.nastavnik.mentorship.dto.CreateMentorshipRequest;
-import org.donriro.nastavnik.mentorship.dto.MentorshipDecisionRequest;
-import org.donriro.nastavnik.mentorship.dto.MentorshipResponse;
+import org.donriro.nastavnik.mentorship.dto.*;
 import org.donriro.nastavnik.mentorship.service.MentorshipService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -36,5 +34,23 @@ public class MentorshipController {
     @PreAuthorize("hasRole('MENTOR')")
     public ResponseEntity<MentorshipResponse> decide(@PathVariable("id") Long mentorshipId, @Valid @RequestBody MentorshipDecisionRequest request) {
         return ResponseEntity.ok(mentorshipService.decide(mentorshipId, request));
+    }
+
+    @GetMapping("/api/mentor/mentees")
+    @PreAuthorize("hasRole('MENTOR')")
+    public ResponseEntity<List<MentorshipResponse>> getCurrentMentorMentees() {
+        return ResponseEntity.ok(mentorshipService.getCurrentMentorMentees());
+    }
+
+    @GetMapping("/api/mentor/mentees/{menteeId}")
+    @PreAuthorize("hasRole('MENTOR')")
+    public ResponseEntity<MenteeProfileResponse> getMenteeProfile(@PathVariable Long menteeId) {
+        return ResponseEntity.ok(mentorshipService.getMenteeProfile(menteeId));
+    }
+
+    @PatchMapping("/api/mentor/mentorship-assignments/{id}/end")
+    @PreAuthorize("hasRole('MENTOR')")
+    public ResponseEntity<MentorshipResponse> endMentorship(@PathVariable("id") Long mentorshipId, @Valid @RequestBody EndMentorshipRequest request) {
+        return ResponseEntity.ok(mentorshipService.endMentorship(mentorshipId, request));
     }
 }
