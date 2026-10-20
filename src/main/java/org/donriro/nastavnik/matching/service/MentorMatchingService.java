@@ -16,6 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -25,13 +26,36 @@ public class MentorMatchingService {
     private final UserRepository userRepository;
     private final ProfileCompatibilityCalculator compatibilityCalculator;
 
-    public List<MentorMatchingResponse> findMentorsFor(User mentee) {
-        if (mentee == null || mentee.getId() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Необходимо указать наставляемого.");
+    /**
+     * Возвращает кандидатов для наставляемого, доступного текущему администратору ОО.
+     * Наставники могут принадлежать любым ОО в том же МСУ.
+     */
+    public List<MentorMatchingResponse> findMentorsForMentee(Long menteeId) {
+        if (menteeId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Необходимо указать ID наставляемого.");
         }
 
-        if (mentee.getRole().getCode() != RoleCode.MENTEE) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Подбор наставников доступен только наставляемому.");
+        User admin = getCurrentUser();
+        if (admin.getRole() == null || admin.getRole().getCode() != RoleCode.OO_ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Подбор наставников доступен администратору ОО.");
+        }
+        if (admin.getEducationalOrganization() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Для администратора не указана образовательная организация.");
+        }
+
+        User mentee = userRepository.findById(menteeId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Наставляемый не найден."));
+
+        if (mentee.getRole() == null || mentee.getRole().getCode() != RoleCode.MENTEE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Указанный пользователь не является наставляемым.");
+        }
+
+        if (mentee.getEducationalOrganization() == null
+                || !Objects.equals(
+                        admin.getEducationalOrganization().getId(),
+                        mentee.getEducationalOrganization().getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Можно подбирать наставников только для наставляемых своей образовательной организации.");
         }
 
         if (mentee.getMsu() == null) {
@@ -39,11 +63,14 @@ public class MentorMatchingService {
         }
 
         if (mentee.isBlocked() || mentee.getAccountStatus() != AccountStatus.ACCEPTED) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Наставляемый должен иметь подтверждённую и активную учётную запись.");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Наставляемый должен иметь подтверждённую и незаблокированную учётную запись.");
         }
 
-        Long msuId = mentee.getMsu().getId();
-        List<User> mentors = userRepository.findEligibleMentors(RoleCode.MENTOR, msuId, AccountStatus.ACCEPTED);
+        List<User> mentors = userRepository.findEligibleMentors(
+                RoleCode.MENTOR,
+                mentee.getMsu().getId(),
+                AccountStatus.ACCEPTED);
 
         return mentors.stream()
                 .map(mentor -> {
@@ -53,7 +80,9 @@ public class MentorMatchingService {
                             mentor.getFirstName(),
                             mentor.getLastName(),
                             mentor.getMiddleName(),
-                            mentor.getEducationalOrganization() != null ? mentor.getEducationalOrganization().getName() : null,
+                            mentor.getEducationalOrganization() != null
+                                    ? mentor.getEducationalOrganization().getName()
+                                    : null,
                             compatibility.compatibilityPercentage(),
                             compatibility.comparableFieldCount()
                     );
@@ -63,12 +92,14 @@ public class MentorMatchingService {
                 .toList();
     }
 
-    public List<MentorMatchingResponse> findMentorsForCurrentUser() {
+    private User getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-        if (authentication == null || !(authentication.getPrincipal() instanceof CustomUserDetails userDetails)) {
+        if (authentication == null
+                || !(authentication.getPrincipal() instanceof CustomUserDetails userDetails)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Необходимо авторизоваться.");
         }
-        return findMentorsFor(userDetails.getUser());
+
+        return userDetails.getUser();
     }
 }
