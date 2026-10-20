@@ -1,6 +1,7 @@
 package org.donriro.nastavnik.mentorship.service;
 
 import lombok.RequiredArgsConstructor;
+import org.donriro.nastavnik.matching.service.ProfileCompatibilityCalculator;
 import org.donriro.nastavnik.mentorship.dto.CreateMentorshipRequest;
 import org.donriro.nastavnik.mentorship.dto.MentorshipDecisionRequest;
 import org.donriro.nastavnik.mentorship.dto.MentorshipResponse;
@@ -25,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
@@ -37,6 +39,7 @@ public class MentorshipService {
     private final AcademicYearRepository academicYearRepository;
     private final MentorshipAuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
+    private final ProfileCompatibilityCalculator compatibilityCalculator;
 
     /**
      * Администратор ОО создаёт предварительную заявку
@@ -70,6 +73,15 @@ public class MentorshipService {
 
         requireActiveAccount(mentee);
         requireActiveAccount(mentor);
+
+        // Предварительно проверяем совместимость наставника
+        // и наставляемого. Допускается только результат строго выше 50%.
+        var compatibility = compatibilityCalculator.calculate(mentor.getId(), mentee.getId());
+        BigDecimal compatibilityPercentage = compatibility.compatibilityPercentage();
+
+        if (compatibilityPercentage == null || compatibilityPercentage.compareTo(BigDecimal.valueOf(50)) <= 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Совместимость наставника и наставляемого должна быть выше 50%.");
+        }
 
         AcademicYear academicYear = academicYearRepository
                 .findByActiveTrue()
@@ -140,9 +152,26 @@ public class MentorshipService {
 
         if (request.decision() == MentorshipDecision.ACCEPT) {
 
-            // Дополнительная проверка перед активацией связи.
+            // Блокируем запись наставника, чтобы параллельные
+            // запросы не могли превысить лимит назначений.
+            User lockedMentor = userRepository
+                    .findByIdForUpdate(mentor.getId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Наставник не найден."));
+
+            requireActiveAccount(lockedMentor);
+
+            // Дополнительная проверка: наставляемый не должен
+            // иметь другого действующего наставника.
             if (mentorshipRepository.existsByMentee_IdAndStatusIn(mentorship.getMentee().getId(), List.of(MentorshipStatus.ACCEPTED))) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "У наставляемого уже есть действующий наставник.");
+            }
+
+            // Учитываем только подтверждённые назначения.
+            long activeMentees = mentorshipRepository
+                    .countByMentor_IdAndStatus(lockedMentor.getId(), MentorshipStatus.ACCEPTED);
+
+            if (activeMentees >= 3) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Наставник уже имеет трёх действующих наставляемых.");
             }
 
             mentorship.setStatus(MentorshipStatus.ACCEPTED);
@@ -150,7 +179,6 @@ public class MentorshipService {
             mentorship.setEndedAt(null);
 
         } else if (request.decision() == MentorshipDecision.REJECT) {
-
             mentorship.setStatus(MentorshipStatus.REJECTED);
             mentorship.setStartedAt(null);
             mentorship.setEndedAt(null);

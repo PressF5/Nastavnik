@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.List;
 
@@ -59,6 +60,7 @@ public class MentorMatchingService {
                     );
                 })
                 .filter(result -> result.compatibilityPercentage() != null)
+                .filter(result -> result.compatibilityPercentage().compareTo(BigDecimal.valueOf(50)) > 0)
                 .sorted(Comparator.comparing(MentorMatchingResponse::compatibilityPercentage).reversed())
                 .toList();
     }

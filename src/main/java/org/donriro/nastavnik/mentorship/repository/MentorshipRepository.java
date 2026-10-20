@@ -18,4 +18,5 @@ public interface MentorshipRepository extends JpaRepository<Mentorship, Long> {
 
     // Проверяем, есть ли у наставника действующая связь с наставляемым.
     boolean existsByMentor_IdAndMentee_IdAndAcademicYear_IdAndStatus(Long mentorId, Long menteeId, Long academicYearId, MentorshipStatus status);
+    long countByMentor_IdAndStatus(Long mentorId, MentorshipStatus status);
 }
