@@ -4,13 +4,20 @@ import lombok.RequiredArgsConstructor;
 import org.donriro.nastavnik.matching.dto.ProfileCompatibilityResponse;
 import org.donriro.nastavnik.matching.entity.ProfileMatchingRule;
 import org.donriro.nastavnik.matching.repository.ProfileMatchingRuleRepository;
+import org.donriro.nastavnik.profile.field.entity.ProfileField;
 import org.donriro.nastavnik.profile.field.type.ProfileFieldType;
 import org.donriro.nastavnik.profile.value.entity.ProfileValue;
 import org.donriro.nastavnik.profile.value.entity.ProfileValueOption;
 import org.donriro.nastavnik.profile.value.repository.ProfileValueOptionRepository;
 import org.donriro.nastavnik.profile.value.repository.ProfileValueRepository;
+import org.donriro.nastavnik.user.entity.User;
+import org.donriro.nastavnik.user.repository.UserRepository;
+import org.donriro.nastavnik.user.role.RoleCode;
+import org.donriro.nastavnik.user.status.AccountStatus;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -23,6 +30,7 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class ProfileCompatibilityCalculator {
 
+    private final UserRepository userRepository;
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
     private static final BigDecimal ZERO = BigDecimal.ZERO;
     private static final BigDecimal ONE = BigDecimal.ONE;
@@ -42,6 +50,11 @@ public class ProfileCompatibilityCalculator {
             throw new IllegalArgumentException("Наставник и наставляемый должны быть разными пользователями.");
         }
 
+        User mentor = userRepository.findById(mentorId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Наставник не найден."));
+        User mentee = userRepository.findById(menteeId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Наставляемый не найден."));
+
+        validateUsers(mentor, mentee);
+
         Map<Long, ProfileValue> mentorValues = loadValues(mentorId);
         Map<Long, ProfileValue> menteeValues = loadValues(menteeId);
 
@@ -53,6 +66,11 @@ public class ProfileCompatibilityCalculator {
         int skippedFieldCount = 0;
 
         for (ProfileMatchingRule rule : rules) {
+            if (!isRuleEligible(rule)) {
+                skippedFieldCount++;
+                continue;
+            }
+
             Long fieldId = rule.getProfileField().getId();
 
             ProfileValue mentorValue = mentorValues.get(fieldId);
@@ -127,7 +145,7 @@ public class ProfileCompatibilityCalculator {
 
     private BigDecimal exactMatch(ProfileValue mentor, ProfileValue mentee, ProfileMatchingRule rule) {
         return switch (rule.getProfileField().getFieldType()) {
-            case TEXT, TEXTAREA -> normalize(mentor.getValueText()).equals(normalize(mentee.getValueText())) ? ONE : ZERO;
+            case TEXT -> normalize(mentor.getValueText()).equals(normalize(mentee.getValueText())) ? ONE : ZERO;
             case SELECT -> loadSelectedOptionIds(mentor).equals(loadSelectedOptionIds(mentee)) ? ONE : ZERO;
             default -> throw new IllegalStateException("EXACT_MATCH не поддерживается для поля типа " + rule.getProfileField().getFieldType());
         };
@@ -160,7 +178,7 @@ public class ProfileCompatibilityCalculator {
 
     private BigDecimal jaccardSimilarity(Set<?> first, Set<?> second) {
         if (first.isEmpty() && second.isEmpty()) {
-            return ONE;
+            return ZERO;
         }
 
         Set<Object> intersection = new HashSet<>(first);
@@ -182,5 +200,28 @@ public class ProfileCompatibilityCalculator {
 
         BigDecimal relativeDifference = first.subtract(second).abs().divide(maxMagnitude, 6, RoundingMode.HALF_UP);
         return ONE.subtract(relativeDifference).max(ZERO).min(ONE);
+    }
+
+    private void validateUsers(User mentor, User mentee) {
+        if (mentor.getId().equals(mentee.getId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Наставник и наставляемый должны быть разными пользователями.");
+        }
+
+        if (mentor.getRole().getCode() != RoleCode.MENTOR || mentee.getRole().getCode() != RoleCode.MENTEE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Необходимо передать наставника и наставляемого с соответствующими ролями.");
+        }
+
+        if (mentor.isBlocked() || mentee.isBlocked()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Заблокированные пользователи не участвуют в подборе.");
+        }
+
+        if (mentor.getAccountStatus() != AccountStatus.ACCEPTED || mentee.getAccountStatus() != AccountStatus.ACCEPTED) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Оба пользователя должны иметь подтверждённые учётные записи.");
+        }
+    }
+
+    private boolean isRuleEligible(ProfileMatchingRule rule) {
+        ProfileField field = rule.getProfileField();
+        return rule.isActive() && field.isActive() && field.isMatchingEnabled();
     }
 }

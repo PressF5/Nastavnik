@@ -40,6 +40,24 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
         """)
     Optional<User> findByEmailWithSecurityData(@Param("email") String email);
 
+    @Query("""
+    select u
+    from User u
+    join fetch u.role
+    join fetch u.region
+    left join fetch u.msu
+    left join fetch u.educationalOrganization
+    where u.role.code = :roleCode
+      and u.msu.id = :msuId
+      and u.accountStatus = :status
+      and u.blocked = false
+    """)
+    List<User> findEligibleMentors(
+            @Param("roleCode") RoleCode roleCode,
+            @Param("msuId") Long msuId,
+            @Param("status") AccountStatus status
+    );
+
     @EntityGraph(attributePaths = {"role", "region", "msu", "educationalOrganization"})
     @Override
     Page<User> findAll(Specification<User> spec, Pageable pageable);
