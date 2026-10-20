@@ -63,6 +63,38 @@ public class MentorMatchingService {
                 .toList();
     }
 
+    public List<MentorMatchingResponse> findMentorsForMentee(Long menteeId) {
+        User admin = getCurrentUser();
+
+        if (admin.getRole().getCode() != RoleCode.OO_ADMIN || admin.getEducationalOrganization() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Подбор наставников доступен администратору ОО.");
+        }
+
+        User mentee = userRepository.findById(menteeId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Наставляемый не найден."));
+
+        if (mentee.getRole().getCode() != RoleCode.MENTEE || mentee.getEducationalOrganization() == null || !admin.getEducationalOrganization().getId().equals(mentee.getEducationalOrganization().getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Наставляемый не относится к вашей образовательной организации."
+            );
+        }
+
+        if (mentee.isBlocked() || mentee.getAccountStatus() != AccountStatus.ACCEPTED) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Наставляемый должен иметь подтверждённую активную учётную запись.");
+        }
+
+        return findMentorsFor(mentee);
+    }
+
+    private User getCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || !(authentication.getPrincipal() instanceof CustomUserDetails userDetails)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Необходимо авторизоваться.");
+        }
+
+        return userDetails.getUser();
+    }
+
     public List<MentorMatchingResponse> findMentorsForCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 

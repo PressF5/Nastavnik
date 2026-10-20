@@ -1,0 +1,251 @@
+package org.donriro.nastavnik.mentorship.service;
+
+import lombok.RequiredArgsConstructor;
+import org.donriro.nastavnik.mentorship.dto.CreateMentorshipRequest;
+import org.donriro.nastavnik.mentorship.dto.MentorshipDecisionRequest;
+import org.donriro.nastavnik.mentorship.dto.MentorshipResponse;
+import org.donriro.nastavnik.mentorship.entity.AcademicYear;
+import org.donriro.nastavnik.mentorship.entity.Mentorship;
+import org.donriro.nastavnik.mentorship.entity.MentorshipAuditLog;
+import org.donriro.nastavnik.mentorship.repository.AcademicYearRepository;
+import org.donriro.nastavnik.mentorship.repository.MentorshipAuditLogRepository;
+import org.donriro.nastavnik.mentorship.repository.MentorshipRepository;
+import org.donriro.nastavnik.mentorship.status.MentorshipDecision;
+import org.donriro.nastavnik.mentorship.status.MentorshipStatus;
+import org.donriro.nastavnik.security.principal.CustomUserDetails;
+import org.donriro.nastavnik.user.entity.User;
+import org.donriro.nastavnik.user.repository.UserRepository;
+import org.donriro.nastavnik.user.role.RoleCode;
+import org.donriro.nastavnik.user.status.AccountStatus;
+import org.donriro.nastavnik.user.status.AuditSource;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.time.Instant;
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class MentorshipService {
+
+    private final MentorshipRepository mentorshipRepository;
+    private final AcademicYearRepository academicYearRepository;
+    private final MentorshipAuditLogRepository auditLogRepository;
+    private final UserRepository userRepository;
+
+    /**
+     * Администратор ОО создаёт предварительную заявку
+     * на назначение наставника наставляемому.
+     */
+    @Transactional
+    public MentorshipResponse createRequest(CreateMentorshipRequest request) {
+        User admin = getCurrentUser();
+
+        requireRole(admin, RoleCode.OO_ADMIN);
+
+        if (admin.getEducationalOrganization() == null || admin.getMsu() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "У администратора не настроена организационная принадлежность.");
+        }
+
+        User mentee = getUser(request.menteeId());
+        User mentor = getUser(request.mentorId());
+
+        requireRole(mentee, RoleCode.MENTEE);
+        requireRole(mentor, RoleCode.MENTOR);
+
+        // Администратор работает только со своей ОО.
+        if (!sameOrganization(admin, mentee)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Наставляемый не относится к вашей образовательной организации.");
+        }
+
+        // Наставник может быть из другой ОО, но только своего МСУ.
+        if (!sameMsu(mentee, mentor)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Наставник и наставляемый должны относиться к одному МСУ.");
+        }
+
+        requireActiveAccount(mentee);
+        requireActiveAccount(mentor);
+
+        AcademicYear academicYear = academicYearRepository
+                .findByActiveTrue()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Не найден активный учебный год."));
+
+        List<MentorshipStatus> occupiedStatuses = List.of(MentorshipStatus.PENDING, MentorshipStatus.ACCEPTED);
+
+        // Не допускаем несколько ожидающих заявок
+        // или действующих наставников у одного наставляемого.
+        if (mentorshipRepository.existsByMentee_IdAndStatusIn(mentee.getId(), occupiedStatuses)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "У наставляемого уже есть ожидающая заявка или действующий наставник.");
+        }
+
+        Mentorship mentorship = new Mentorship();
+        mentorship.setMentor(mentor);
+        mentorship.setMentee(mentee);
+        mentorship.setCreatedBy(admin);
+        mentorship.setAcademicYear(academicYear);
+        mentorship.setMsu(mentee.getMsu());
+        mentorship.setStatus(MentorshipStatus.PENDING);
+
+        Mentorship saved = mentorshipRepository.save(mentorship);
+
+        writeAudit(saved, admin, "REQUEST_CREATED", null, MentorshipStatus.PENDING, null);
+        return toResponse(saved);
+    }
+
+    /**
+     * Наставник видит только ожидающие заявки,
+     * которые адресованы именно ему.
+     */
+    public List<MentorshipResponse> getCurrentMentorRequests() {
+        User mentor = getCurrentUser();
+
+        requireRole(mentor, RoleCode.MENTOR);
+
+        return mentorshipRepository
+                .findAllByMentor_IdAndStatusOrderByCreatedAtDesc(mentor.getId(), MentorshipStatus.PENDING)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    /**
+     * Наставник принимает или отклоняет заявку.
+     */
+    @Transactional
+    public MentorshipResponse decide(Long mentorshipId, MentorshipDecisionRequest request) {
+        User mentor = getCurrentUser();
+
+        requireRole(mentor, RoleCode.MENTOR);
+        requireActiveAccount(mentor);
+
+        Mentorship mentorship = mentorshipRepository
+                .findById(mentorshipId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Заявка на наставничество не найдена."));
+
+        // Нельзя обрабатывать чужие заявки.
+        if (!mentorship.getMentor().getId().equals(mentor.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Эта заявка адресована другому наставнику.");
+        }
+
+        if (mentorship.getStatus() != MentorshipStatus.PENDING) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Заявка уже обработана.");
+        }
+
+        MentorshipStatus oldStatus = mentorship.getStatus();
+
+        if (request.decision() == MentorshipDecision.ACCEPT) {
+
+            // Дополнительная проверка перед активацией связи.
+            if (mentorshipRepository.existsByMentee_IdAndStatusIn(mentorship.getMentee().getId(), List.of(MentorshipStatus.ACCEPTED))) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "У наставляемого уже есть действующий наставник.");
+            }
+
+            mentorship.setStatus(MentorshipStatus.ACCEPTED);
+            mentorship.setStartedAt(Instant.now());
+            mentorship.setEndedAt(null);
+
+        } else if (request.decision() == MentorshipDecision.REJECT) {
+
+            mentorship.setStatus(MentorshipStatus.REJECTED);
+            mentorship.setStartedAt(null);
+            mentorship.setEndedAt(null);
+
+        } else {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Неизвестное решение по заявке.");
+        }
+
+        Mentorship saved = mentorshipRepository.save(mentorship);
+        writeAudit(saved, mentor, request.decision() == MentorshipDecision.ACCEPT ? "REQUEST_ACCEPTED" : "REQUEST_REJECTED", oldStatus, saved.getStatus(), request.comment());
+
+        return toResponse(saved);
+    }
+
+    private void writeAudit(Mentorship mentorship, User actor, String action, MentorshipStatus oldStatus, MentorshipStatus newStatus, String comment) {
+        MentorshipAuditLog auditLog = new MentorshipAuditLog();
+
+        auditLog.setMentorship(mentorship);
+        auditLog.setActor(actor);
+        auditLog.setMsuId(mentorship.getMsu().getId());
+        auditLog.setAction(action);
+        auditLog.setOldStatus(oldStatus);
+        auditLog.setNewStatus(newStatus);
+        auditLog.setComment(comment);
+        auditLog.setSource(AuditSource.USER);
+
+        auditLogRepository.save(auditLog);
+    }
+
+    private MentorshipResponse toResponse(Mentorship mentorship) {
+        User mentor = mentorship.getMentor();
+        User mentee = mentorship.getMentee();
+        AcademicYear academicYear = mentorship.getAcademicYear();
+
+        return new MentorshipResponse(
+                mentorship.getId(),
+
+                mentor.getId(),
+                mentor.getFirstName(),
+                mentor.getLastName(),
+                mentor.getMiddleName(),
+
+                mentee.getId(),
+                mentee.getFirstName(),
+                mentee.getLastName(),
+                mentee.getMiddleName(),
+
+                academicYear.getId(),
+                academicYear.getName(),
+
+                mentorship.getStatus(),
+
+                mentorship.getCreatedAt(),
+                mentorship.getStartedAt(),
+                mentorship.getEndedAt()
+        );
+    }
+
+    private User getCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof CustomUserDetails userDetails)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Необходимо авторизоваться.");
+        }
+
+        return userDetails.getUser();
+    }
+
+    private User getUser(Long id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Пользователь не найден: " + id));
+    }
+
+    private void requireRole(User user, RoleCode expectedRole) {
+        if (user.getRole() == null || user.getRole().getCode() != expectedRole) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Недостаточно прав для выполнения операции.");
+        }
+    }
+
+    private void requireActiveAccount(User user) {
+        if (user.isBlocked() || user.getAccountStatus() != AccountStatus.ACCEPTED) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Учётная запись должна быть подтверждена и не заблокирована.");
+        }
+    }
+
+    private boolean sameOrganization(User first, User second) {
+        return first.getEducationalOrganization() != null
+                && second.getEducationalOrganization() != null
+                && first.getEducationalOrganization().getId()
+                .equals(second.getEducationalOrganization().getId());
+    }
+
+    private boolean sameMsu(User first, User second) {
+        return first.getMsu() != null
+                && second.getMsu() != null
+                && first.getMsu().getId()
+                .equals(second.getMsu().getId());
+    }
+}
