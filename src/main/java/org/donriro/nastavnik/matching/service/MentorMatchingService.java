@@ -47,7 +47,7 @@ public class MentorMatchingService {
         }
 
         Long msuId = mentee.getMsu().getId();
-        List<User> mentors = userRepository.findEligibleMentors(RoleCode.MENTOR, msuId, AccountStatus.ACCEPTED);
+        List<User> mentors = userRepository.findEligibleMentors(RoleCode.MENTOR, msuId, AccountStatus.ACCEPTED, MentorshipStatus.ACCEPTED, 3);
 
         return mentors.stream()
                 .map(mentor -> {
@@ -71,8 +71,12 @@ public class MentorMatchingService {
     public List<MentorMatchingResponse> findMentorsForMentee(Long menteeId) {
         User admin = getCurrentUser();
 
-        if (admin.getRole().getCode() != RoleCode.OO_ADMIN || admin.getEducationalOrganization() == null) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Подбор наставников доступен администратору ОО.");
+        if (admin.getRole() == null || admin.getRole().getCode() != RoleCode.OO_ADMIN || admin.getEducationalOrganization() == null || admin.getMsu() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Подбор наставников доступен администратору ОО с настроенной организационной принадлежностью.");
+        }
+
+        if (admin.isBlocked() || admin.getAccountStatus() != AccountStatus.ACCEPTED) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Учётная запись администратора должна быть подтверждена и не заблокирована.");
         }
 
         User mentee = userRepository.findById(menteeId)

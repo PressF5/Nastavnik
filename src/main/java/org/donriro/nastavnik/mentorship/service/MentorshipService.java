@@ -50,6 +50,7 @@ public class MentorshipService {
         User admin = getCurrentUser();
 
         requireRole(admin, RoleCode.OO_ADMIN);
+        requireActiveAccount(admin);
 
         if (admin.getEducationalOrganization() == null || admin.getMsu() == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "У администратора не настроена организационная принадлежность.");
@@ -122,6 +123,7 @@ public class MentorshipService {
         User mentor = getCurrentUser();
 
         requireRole(mentor, RoleCode.MENTOR);
+        requireActiveAccount(mentor);
 
         return mentorshipRepository
                 .findAllByMentor_IdAndStatusOrderByCreatedAtDesc(mentor.getId(), MentorshipStatus.PENDING)
@@ -185,16 +187,27 @@ public class MentorshipService {
 
         MentorshipStatus oldStatus = mentorship.getStatus();
 
+
         if (request.decision() == MentorshipDecision.ACCEPT) {
+
+            // Блокируем наставляемого до завершения транзакции.
+            // Если другой наставник одновременно пытается принять
+            // другую заявку этого же пользователя, он будет ждать.
+            User mentee = userRepository
+                    .findByIdForUpdate(mentorship.getMentee().getId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Наставляемый не найден."));
+
+            // После получения блокировки проверяем актуальное состояние.
             // У наставляемого может быть только один действующий наставник.
-            if (mentorshipRepository.existsByMentee_IdAndStatusIn(mentorship.getMentee().getId(), List.of(MentorshipStatus.ACCEPTED))) {
+            boolean alreadyHasMentor = mentorshipRepository.existsByMentee_IdAndStatusIn(mentee.getId(), List.of(MentorshipStatus.ACCEPTED));
+
+            if (alreadyHasMentor) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "У наставляемого уже есть действующий наставник.");
             }
 
-            // Ограничиваем только подтверждённые назначения.
-            // Ожидающие заявки в лимит не входят.
-            long activeMentees =
-                    mentorshipRepository.countByMentor_IdAndStatus(mentor.getId(), MentorshipStatus.ACCEPTED);
+            // Считаем только действующие назначения.
+            // Заявки PENDING в лимит не входят.
+            long activeMentees = mentorshipRepository.countByMentor_IdAndStatus(mentor.getId(), MentorshipStatus.ACCEPTED);
 
             if (activeMentees >= 3) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Наставник уже имеет трёх действующих наставляемых.");

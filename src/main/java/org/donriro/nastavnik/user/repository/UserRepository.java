@@ -12,7 +12,6 @@ import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -40,6 +39,13 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
         """)
     Optional<User> findByEmailWithSecurityData(@Param("email") String email);
 
+    /**
+     * Возвращает подтверждённых и незаблокированных наставников
+     * указанного МСУ, у которых ещё есть свободное место.
+     *
+     * Наставник может иметь не более трёх действующих наставляемых.
+     * Ожидающие заявки PENDING не учитываются.
+     */
     @Query("""
     select u
     from User u
@@ -51,11 +57,20 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
       and u.msu.id = :msuId
       and u.accountStatus = :status
       and u.blocked = false
+      and (
+          select count(m.id)
+          from Mentorship m
+          where m.mentor.id = u.id
+            and m.status = :activeStatus
+      ) < :maxActiveMentees
+    order by u.lastName, u.firstName, u.middleName
     """)
     List<User> findEligibleMentors(
             @Param("roleCode") RoleCode roleCode,
             @Param("msuId") Long msuId,
-            @Param("status") AccountStatus status
+            @Param("status") AccountStatus status,
+            @Param("activeStatus") MentorshipStatus activeStatus,
+            @Param("maxActiveMentees") long maxActiveMentees
     );
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
