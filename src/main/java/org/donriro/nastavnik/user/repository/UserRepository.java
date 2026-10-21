@@ -39,38 +39,32 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
         """)
     Optional<User> findByEmailWithSecurityData(@Param("email") String email);
 
+
     /**
      * Возвращает подтверждённых и незаблокированных наставников
-     * указанного МСУ, у которых ещё есть свободное место.
+     * указанного МСУ.
      *
-     * Наставник может иметь не более трёх действующих наставляемых.
-     * Ожидающие заявки PENDING не учитываются.
+     * Количество действующих наставляемых не ограничивает подбор
+     * наставника: администратор ОО может отправить ему новую заявку.
+     * Ограничение в три наставляемых проверяется при принятии заявки.
      */
     @Query("""
-    select u
-    from User u
-    join fetch u.role
-    join fetch u.region
-    left join fetch u.msu
-    left join fetch u.educationalOrganization
-    where u.role.code = :roleCode
-      and u.msu.id = :msuId
-      and u.accountStatus = :status
-      and u.blocked = false
-      and (
-          select count(m.id)
-          from Mentorship m
-          where m.mentor.id = u.id
-            and m.status = :activeStatus
-      ) < :maxActiveMentees
-    order by u.lastName, u.firstName, u.middleName
-    """)
+        select u
+        from User u
+        join fetch u.role
+        join fetch u.region
+        left join fetch u.msu
+        left join fetch u.educationalOrganization
+        where u.role.code = :roleCode
+          and u.msu.id = :msuId
+          and u.accountStatus = :status
+          and u.blocked = false
+        order by u.lastName, u.firstName, u.middleName
+        """)
     List<User> findEligibleMentors(
             @Param("roleCode") RoleCode roleCode,
             @Param("msuId") Long msuId,
-            @Param("status") AccountStatus status,
-            @Param("activeStatus") MentorshipStatus activeStatus,
-            @Param("maxActiveMentees") long maxActiveMentees
+            @Param("status") AccountStatus status
     );
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
