@@ -53,4 +53,14 @@ public class MentorshipController {
     public ResponseEntity<MentorshipResponse> endMentorship(@PathVariable("id") Long mentorshipId, @Valid @RequestBody EndMentorshipRequest request) {
         return ResponseEntity.ok(mentorshipService.endMentorship(mentorshipId, request));
     }
+
+    /**
+     * Список наставляемых, которым администратор ОО
+     * может назначить наставника.
+     */
+    @GetMapping("/api/admin/mentees/available")
+    @PreAuthorize("hasRole('OO_ADMIN')")
+    public ResponseEntity<List<AvailableMenteeResponse>> getAvailableMentees() {
+        return ResponseEntity.ok(mentorshipService.getAvailableMentees());
+    }
 }

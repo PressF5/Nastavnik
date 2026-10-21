@@ -299,6 +299,36 @@ public class MentorshipService {
         return toResponse(saved);
     }
 
+    /**
+     * Возвращает наставляемых текущей ОО,
+     * которым можно назначить наставника.
+     */
+    public List<AvailableMenteeResponse> getAvailableMentees() {
+        User admin = getCurrentUser();
+
+        requireRole(admin, RoleCode.OO_ADMIN);
+        requireActiveAccount(admin);
+
+        if (admin.getEducationalOrganization() == null || admin.getMsu() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "У администратора не настроена организационная принадлежность.");
+        }
+
+        return userRepository.findAvailableMentees(
+                        RoleCode.MENTEE,
+                        admin.getEducationalOrganization().getId(),
+                        AccountStatus.ACCEPTED,
+                        List.of(MentorshipStatus.PENDING, MentorshipStatus.ACCEPTED))
+                .stream()
+                .map(mentee -> new AvailableMenteeResponse(
+                        mentee.getId(),
+                        mentee.getFirstName(),
+                        mentee.getLastName(),
+                        mentee.getMiddleName(),
+                        mentee.getBirthDate()
+                ))
+                .toList();
+    }
+
     private void writeAudit(Mentorship mentorship, User actor, String action, MentorshipStatus oldStatus, MentorshipStatus newStatus, String comment) {
         MentorshipAuditLog auditLog = new MentorshipAuditLog();
 

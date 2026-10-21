@@ -2,6 +2,8 @@ package org.donriro.nastavnik.matching.service;
 
 import lombok.RequiredArgsConstructor;
 import org.donriro.nastavnik.matching.dto.MentorMatchingResponse;
+import org.donriro.nastavnik.mentorship.repository.MentorshipRepository;
+import org.donriro.nastavnik.mentorship.status.MentorshipStatus;
 import org.donriro.nastavnik.security.principal.CustomUserDetails;
 import org.donriro.nastavnik.user.entity.User;
 import org.donriro.nastavnik.user.repository.UserRepository;
@@ -25,6 +27,7 @@ public class MentorMatchingService {
 
     private final UserRepository userRepository;
     private final ProfileCompatibilityCalculator compatibilityCalculator;
+    private final MentorshipRepository mentorshipRepository;
 
     public List<MentorMatchingResponse> findMentorsFor(User mentee) {
         if (mentee == null || mentee.getId() == null) {
@@ -82,6 +85,10 @@ public class MentorMatchingService {
 
         if (mentee.isBlocked() || mentee.getAccountStatus() != AccountStatus.ACCEPTED) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Наставляемый должен иметь подтверждённую активную учётную запись.");
+        }
+
+        if (mentorshipRepository.existsByMentee_IdAndStatusIn(mentee.getId(), List.of(MentorshipStatus.PENDING, MentorshipStatus.ACCEPTED))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Для наставляемого уже создана заявка или назначен наставник.");
         }
 
         return findMentorsFor(mentee);
