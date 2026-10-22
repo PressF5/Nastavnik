@@ -10,5 +10,6 @@ import java.util.Optional;
 public interface RegionRepository extends JpaRepository<Region, Long> {
 
     boolean existsByCode(Integer code);
+    boolean existsBy();
     Optional<Region> findByCode(Integer code);
 }

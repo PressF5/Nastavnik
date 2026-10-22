@@ -9,7 +9,7 @@ import java.util.List;
 @Repository
 public interface MsuRepository extends JpaRepository<Msu, Long> {
 
-    List<Msu> findAllByRegionId(Long regionId);
+    List<Msu> findAllByOrderByNameAsc();
     boolean existsByIdAndRegionId(Long id, Long regionId);
     boolean existsByRegionIdAndCode(Long regionId, Integer code);
 }

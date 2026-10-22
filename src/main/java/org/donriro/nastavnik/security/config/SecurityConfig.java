@@ -48,7 +48,9 @@ public class SecurityConfig {
                                 "/api/auth/csrf",
                                 "/api/bootstrap/status",
                                 "/api/bootstrap/region-admin",
-                                "/api/registration"
+                                "/api/registration",
+                                "/api/registration/msus",
+                                "/api/registration/msus/*/educational-organizations"
                         ).permitAll()
                         .anyRequest()
                         .authenticated())

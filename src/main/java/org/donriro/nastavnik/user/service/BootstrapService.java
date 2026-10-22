@@ -32,7 +32,10 @@ public class BootstrapService {
     private final PasswordEncoder passwordEncoder;
 
     public BootstrapStatusResponse getStatus() {
-        boolean initialized = userRepository.existsByRoleCode(RoleCode.REGION_ADMIN);
+        boolean regionExists = regionRepository.count() > 0;
+        boolean regionAdminExists = userRepository.existsByRoleCode(RoleCode.REGION_ADMIN);
+        boolean initialized = regionExists && regionAdminExists;
+
         return new BootstrapStatusResponse(initialized);
     }
 
@@ -64,8 +67,8 @@ public class BootstrapService {
     }
 
     private Region createRegion(RegionAdminBootstrapRequest request) {
-        if (regionRepository.existsByCode(request.regionCode())) {
-            throw new RegionAlreadyExistsException("Регион с таким кодом уже существует.");
+        if (regionRepository.existsBy()) {
+            throw new RegionAlreadyExistsException("Регион уже создан. Повторная первоначальная настройка запрещена.");
         }
 
         Region region = new Region();
