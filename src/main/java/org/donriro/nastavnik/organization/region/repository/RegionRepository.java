@@ -7,9 +7,4 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 
 @Repository
-public interface RegionRepository extends JpaRepository<Region, Long> {
-
-    boolean existsByCode(Integer code);
-    boolean existsBy();
-    Optional<Region> findByCode(Integer code);
-}
+public interface RegionRepository extends JpaRepository<Region, Long> {}

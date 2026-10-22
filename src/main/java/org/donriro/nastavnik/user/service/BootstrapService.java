@@ -67,7 +67,7 @@ public class BootstrapService {
     }
 
     private Region createRegion(RegionAdminBootstrapRequest request) {
-        if (regionRepository.existsBy()) {
+        if (regionRepository.count() > 0) {
             throw new RegionAlreadyExistsException("Регион уже создан. Повторная первоначальная настройка запрещена.");
         }
 
