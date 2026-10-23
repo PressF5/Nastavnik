@@ -2,11 +2,14 @@ package org.donriro.nastavnik.organization.msu.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.donriro.nastavnik.organization.educationalorganization.dto.response.EducationalOrganizationResponse;
+import org.donriro.nastavnik.organization.educationalorganization.entity.EducationalOrganization;
 import org.donriro.nastavnik.organization.msu.dto.request.CreateMsuRequest;
 import org.donriro.nastavnik.organization.msu.dto.response.MsuResponse;
 import org.donriro.nastavnik.organization.msu.entity.Msu;
 import org.donriro.nastavnik.organization.msu.service.MsuService;
 import org.donriro.nastavnik.security.principal.CustomUserDetails;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -29,17 +32,18 @@ public class MsuController {
     }
 
     @GetMapping
-    public ResponseEntity<List<MsuResponse>> getAll(@AuthenticationPrincipal CustomUserDetails principal) {
-        List<MsuResponse> response = msuService
-                .getAllForRegionAdmin(principal.getUser().getId())
-                .stream()
-                .map(msu -> new MsuResponse(
-                        msu.getId(),
-                        msu.getCode(),
-                        msu.getName(),
-                        msu.getRegion().getId()
-                ))
-                .toList();
+    public ResponseEntity<Page<MsuResponse>> getAll(
+            @AuthenticationPrincipal CustomUserDetails principal,
+            @RequestParam(defaultValue = "") String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        Page<MsuResponse> response = msuService
+                .getPageForRegionAdmin(
+                        principal.getUser().getId(),
+                        search,
+                        page,
+                        size)
+                .map(this::toResponse);
 
         return ResponseEntity.ok(response);
     }
@@ -54,5 +58,55 @@ public class MsuController {
     public ResponseEntity<Void> delete(@AuthenticationPrincipal CustomUserDetails principal, @PathVariable Long id) {
         msuService.delete(principal.getUser().getId(), id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<MsuResponse> getById(
+            @AuthenticationPrincipal CustomUserDetails principal,
+            @PathVariable Long id
+    ) {
+        Msu msu = msuService.getByIdForRegionAdmin(
+                principal.getUser().getId(),
+                id
+        );
+
+        return ResponseEntity.ok(toResponse(msu));
+    }
+
+    @GetMapping("/{id}/educational-organizations")
+    public ResponseEntity<Page<EducationalOrganizationResponse>>
+    getEducationalOrganizations(
+            @AuthenticationPrincipal CustomUserDetails principal,
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        Page<EducationalOrganizationResponse> response = msuService
+                .getEducationalOrganizationsForRegionAdmin(
+                        principal.getUser().getId(),
+                        id,
+                        page,
+                        size)
+                .map(this::toEducationalOrganizationResponse);
+
+        return ResponseEntity.ok(response);
+    }
+
+    private MsuResponse toResponse(Msu msu) {
+        return new MsuResponse(
+                msu.getId(),
+                msu.getCode(),
+                msu.getName(),
+                msu.getRegion().getId()
+        );
+    }
+
+    private EducationalOrganizationResponse
+    toEducationalOrganizationResponse(EducationalOrganization organization) {
+        return new EducationalOrganizationResponse(
+                organization.getId(),
+                organization.getCode(),
+                organization.getName(),
+                organization.getMsu().getId()
+        );
     }
 }
