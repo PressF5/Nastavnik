@@ -8,7 +8,7 @@ import java.util.List;
 
 @Repository
 public interface EducationalOrganizationRepository extends JpaRepository<EducationalOrganization, Long> {
-
+    boolean existsByMsuId(Long msuId);
     List<EducationalOrganization> findAllByMsuIdOrderByNameAsc(Long msuId);
     boolean existsByIdAndMsuId(Long id, Long msuId);
     boolean existsByIdAndMsuRegionId(Long id, Long regionId);

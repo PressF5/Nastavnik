@@ -1,6 +1,7 @@
 package org.donriro.nastavnik.organization.msu.service;
 
 import lombok.RequiredArgsConstructor;
+import org.donriro.nastavnik.organization.educationalorganization.repository.EducationalOrganizationRepository;
 import org.donriro.nastavnik.organization.msu.dto.request.CreateMsuRequest;
 import org.donriro.nastavnik.organization.msu.entity.Msu;
 import org.donriro.nastavnik.organization.msu.repository.MsuRepository;
@@ -14,6 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -21,6 +24,7 @@ public class MsuService {
 
     private final MsuRepository msuRepository;
     private final UserRepository userRepository;
+    private final EducationalOrganizationRepository educationalOrganizationRepository;
 
     @Transactional
     @PreAuthorize("@roleAccess.isRegionAdmin(authentication)")
@@ -40,6 +44,62 @@ public class MsuService {
         msu.setRegion(actor.getRegion());
 
         return msuRepository.save(msu);
+    }
+
+    @PreAuthorize("@roleAccess.isRegionAdmin(authentication)")
+    public List<Msu> getAllForRegionAdmin(Long actorId) {
+        User actor = getUser(actorId);
+        checkRegionAdmin(actor);
+
+        return msuRepository.findAllByRegionIdOrderByNameAsc(actor.getRegion().getId());
+    }
+
+    @Transactional
+    @PreAuthorize("@roleAccess.isRegionAdmin(authentication)")
+    public Msu update(Long actorId, Long msuId, CreateMsuRequest request) {
+        User actor = getUser(actorId);
+        checkRegionAdmin(actor);
+
+        Msu msu = msuRepository.findById(msuId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "МСУ не найдено."));
+
+        // Администратор может изменять только МСУ своего региона.
+        if (!msu.getRegion().getId().equals(actor.getRegion().getId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "МСУ не найдено.");
+        }
+
+        if (msuRepository.existsByRegionIdAndCodeAndIdNot(actor.getRegion().getId(), request.code(), msuId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "МСУ с таким кодом уже существует в регионе.");
+        }
+
+        msu.setCode(request.code());
+        msu.setName(request.name().trim());
+
+        return msuRepository.save(msu);
+    }
+
+    @Transactional
+    @PreAuthorize("@roleAccess.isRegionAdmin(authentication)")
+    public void delete(Long actorId, Long msuId) {
+        User actor = getUser(actorId);
+        checkRegionAdmin(actor);
+
+        Msu msu = msuRepository.findById(msuId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "МСУ не найдено."));
+
+        if (!msu.getRegion().getId().equals(actor.getRegion().getId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "МСУ не найдено.");
+        }
+
+        if (educationalOrganizationRepository.existsByMsuId(msuId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Нельзя удалить МСУ: к нему прикреплены образовательные организации.");
+        }
+
+        if (userRepository.existsByRoleCodeAndMsuId(RoleCode.MSU_ADMIN, msuId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Нельзя удалить МСУ: к нему прикреплены администраторы.");
+        }
+
+        msuRepository.delete(msu);
     }
 
     private void checkRegionAdmin(User actor) {
