@@ -16,6 +16,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -184,7 +185,20 @@ public class GlobalExceptionHandler {
                 .body(Map.of( "timestamp", Instant.now().toString(),
                         "status", HttpStatus.BAD_REQUEST.value(),
                         "error", "Bad Request",
-                        "message", exception.getMessage() )); }
+                        "message", exception.getMessage() ));
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Map<String, Object>> handleResponseStatusException(ResponseStatusException exception) {
+        HttpStatus status = HttpStatus.valueOf(exception.getStatusCode().value());
+        String message = exception.getReason() != null ? exception.getReason() : status.getReasonPhrase();
+        return ResponseEntity.status(exception.getStatusCode())
+                .body(Map.of(
+                        "status", exception.getStatusCode().value(),
+                        "error", status.getReasonPhrase(),
+                        "message", message
+                ));
+    }
 
     private ResponseEntity<ApiError> buildError(HttpStatus status, ErrorCode code, String message) {
         return ResponseEntity.status(status).body(new ApiError(code, message));
