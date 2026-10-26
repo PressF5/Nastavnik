@@ -2,6 +2,7 @@ package org.donriro.nastavnik.organization.educationalorganization.service;
 
 import lombok.RequiredArgsConstructor;
 import org.donriro.nastavnik.organization.educationalorganization.dto.request.CreateEducationalOrganizationRequest;
+import org.donriro.nastavnik.organization.educationalorganization.dto.request.UpdateEducationalOrganizationRequest;
 import org.donriro.nastavnik.organization.educationalorganization.entity.EducationalOrganization;
 import org.donriro.nastavnik.organization.educationalorganization.repository.EducationalOrganizationRepository;
 import org.donriro.nastavnik.organization.msu.entity.Msu;
@@ -54,6 +55,86 @@ public class EducationalOrganizationService {
         organization.setMsu(msu);
 
         return educationalOrganizationRepository.save(organization);
+    }
+
+    /**
+     * Редактирует код и название образовательной организации.
+     * МСУ остаётся прежним.
+     */
+    @Transactional
+    @PreAuthorize("@roleAccess.isRegionAdmin(authentication) or @roleAccess.isMsuAdmin(authentication)")
+    public EducationalOrganization update(Long actorId, Long organizationId, UpdateEducationalOrganizationRequest request) {
+        User actor = getUser(actorId);
+        checkAdministrator(actor);
+
+        EducationalOrganization organization = getOrganization(organizationId);
+
+        checkOrganizationAccess(actor, organization);
+
+        Long msuId = organization.getMsu().getId();
+
+        if (educationalOrganizationRepository.existsByMsuIdAndCodeAndIdNot(msuId, request.code(), organizationId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "ОО с таким кодом уже существует в данном МСУ.");
+        }
+
+        organization.setCode(request.code());
+        organization.setName(request.name().trim());
+
+        return educationalOrganizationRepository.save(organization);
+    }
+
+    /**
+     * Удаляет ОО, если к ней не прикреплены пользователи.
+     */
+    @Transactional
+    @PreAuthorize("@roleAccess.isRegionAdmin(authentication) " + "or @roleAccess.isMsuAdmin(authentication)")
+    public void delete(Long actorId, Long organizationId) {
+        User actor = getUser(actorId);
+        checkAdministrator(actor);
+
+        EducationalOrganization organization = getOrganization(organizationId);
+
+        checkOrganizationAccess(actor, organization);
+
+        if (userRepository.existsByEducationalOrganizationId(organizationId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Нельзя удалить ОО: к ней прикреплены пользователи.");
+        }
+
+        educationalOrganizationRepository.delete(organization);
+    }
+
+    private EducationalOrganization getOrganization(Long organizationId) {
+        return educationalOrganizationRepository.findById(organizationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Образовательная организация не найдена."));
+    }
+
+    /**
+     * Проверяет, относится ли ОО к области полномочий администратора.
+     */
+    private void checkOrganizationAccess(User actor, EducationalOrganization organization) {
+        RoleCode role = actor.getRole().getCode();
+
+        if (role == RoleCode.REGION_ADMIN) {
+            if (actor.getRegion() == null
+                    || organization.getMsu().getRegion() == null
+                    || !actor.getRegion().getId().equals(
+                    organization.getMsu().getRegion().getId()
+            )) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Образовательная организация не найдена.");
+            }
+
+            return;
+        }
+
+        if (role == RoleCode.MSU_ADMIN) {
+            if (actor.getMsu() == null || !actor.getMsu().getId().equals(organization.getMsu().getId())) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Образовательная организация не найдена.");
+            }
+
+            return;
+        }
+
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Недостаточно прав для управления ОО.");
     }
 
     /**

@@ -3,6 +3,7 @@ package org.donriro.nastavnik.organization.educationalorganization.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.donriro.nastavnik.organization.educationalorganization.dto.request.CreateEducationalOrganizationRequest;
+import org.donriro.nastavnik.organization.educationalorganization.dto.request.UpdateEducationalOrganizationRequest;
 import org.donriro.nastavnik.organization.educationalorganization.dto.response.EducationalOrganizationResponse;
 import org.donriro.nastavnik.organization.educationalorganization.entity.EducationalOrganization;
 import org.donriro.nastavnik.organization.educationalorganization.service.EducationalOrganizationService;
@@ -10,10 +11,7 @@ import org.donriro.nastavnik.security.principal.CustomUserDetails;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/admin/educational-organizations")
@@ -29,5 +27,24 @@ public class EducationalOrganizationController {
         EducationalOrganizationResponse response = new EducationalOrganizationResponse(organization.getId(),
                 organization.getCode(), organization.getName(), organization.getMsu().getId());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<EducationalOrganizationResponse> update(@AuthenticationPrincipal CustomUserDetails principal, @PathVariable Long id, @Valid @RequestBody UpdateEducationalOrganizationRequest request) {
+        EducationalOrganization organization = educationalOrganizationService.update(principal.getUser().getId(), id, request);
+        return ResponseEntity.ok(
+                new EducationalOrganizationResponse(
+                        organization.getId(),
+                        organization.getCode(),
+                        organization.getName(),
+                        organization.getMsu().getId()
+                )
+        );
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@AuthenticationPrincipal CustomUserDetails principal, @PathVariable Long id) {
+        educationalOrganizationService.delete(principal.getUser().getId(), id);
+        return ResponseEntity.noContent().build();
     }
 }
