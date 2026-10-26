@@ -12,6 +12,9 @@ public record CreateEducationalOrganizationRequest(
 
         @NotBlank
         @Size(max = 500)
-        String name
+        String name,
+
+        @Positive
+        Long msuId
 ) {
 }

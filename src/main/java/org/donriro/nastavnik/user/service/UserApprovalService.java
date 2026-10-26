@@ -205,11 +205,44 @@ public class UserApprovalService {
         return savedUser;
     }
 
+    /**
+     * Проверяет, может ли администратор обработать заявку:
+     * подтвердить или отклонить её.
+     * Для этой операции действуют отдельные правила доступа.
+     * Они не расширяют полномочия на блокировку аккаунтов
+     * и восстановление отклонённых заявок.
+     */
     private boolean canManage(User actor, User target) {
         return actor.getAccountStatus() == AccountStatus.ACCEPTED
                 && !actor.isBlocked()
                 && target.getAccountStatus() == AccountStatus.PENDING
-                && hasManagementScope(actor, target);
+                && hasApprovalScope(actor, target);
+    }
+
+    /**
+     * Проверяет полномочия администратора именно на подтверждение
+     * или отклонение заявки.
+     */
+    private boolean hasApprovalScope(User actor, User target) {
+        RoleCode actorRole = actor.getRole().getCode();
+        RoleCode targetRole = target.getRole().getCode();
+
+        return switch (actorRole) {
+            // Администратор региона:
+            // подтверждает администраторов МСУ и администраторов ОО
+            // только в пределах своего региона.
+            case REGION_ADMIN -> (targetRole == RoleCode.MSU_ADMIN || targetRole == RoleCode.OO_ADMIN) && sameRegion(actor, target);
+
+            // Администратор МСУ:
+            // подтверждает администраторов ОО и наставников
+            // только в пределах своего МСУ.
+            case MSU_ADMIN -> (targetRole == RoleCode.OO_ADMIN || targetRole == RoleCode.MENTOR) && sameMsu(actor, target);
+
+            // Администратор ОО:
+            // подтверждает наставляемых своей организации.
+            case OO_ADMIN -> targetRole == RoleCode.MENTEE && sameOrganization(actor, target);
+            default -> false;
+        };
     }
 
     private boolean hasManagementScope(User actor, User target) {
