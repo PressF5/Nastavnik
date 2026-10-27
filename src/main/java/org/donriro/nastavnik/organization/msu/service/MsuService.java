@@ -221,7 +221,6 @@ public class MsuService {
         validatePagination(page, size);
 
         Long regionId = actor.getRegion().getId();
-        String normalizedSearch = search == null ? "" : search.trim();
 
         // Проверяем, что МСУ относится к региону текущего администратора.
         findMsuInRegion(msuId, regionId);
