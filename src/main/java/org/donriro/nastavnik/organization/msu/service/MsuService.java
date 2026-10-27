@@ -54,6 +54,58 @@ public class MsuService {
         return msuRepository.save(msu);
     }
 
+    /**
+     * Получает МСУ текущего администратора.
+     */
+    @PreAuthorize("@roleAccess.isMsuAdmin(authentication)")
+    public Msu getCurrentMsuForMsuAdmin(Long actorId) {
+        User actor = getUser(actorId);
+        checkMsuAdmin(actor);
+
+        return actor.getMsu();
+    }
+
+    /**
+     * Получает страницу ОО собственного МСУ администратора.
+     * Чужой msuId клиент передать не может: МСУ определяется
+     * по авторизованному пользователю.
+     */
+    @PreAuthorize("@roleAccess.isMsuAdmin(authentication)")
+    public Page<EducationalOrganization> getEducationalOrganizationsForMsuAdmin(
+            Long actorId,
+            String search,
+            int page,
+            int size) {
+        User actor = getUser(actorId);
+        checkMsuAdmin(actor);
+        validatePagination(page, size);
+
+        return searchEducationalOrganizations(
+                actor.getMsu().getId(),
+                actor.getRegion().getId(),
+                search,
+                page,
+                size
+        );
+    }
+
+    /**
+     * Проверяет состояние учётной записи и корректность привязки МСУ.
+     */
+    private void checkMsuAdmin(User actor) {
+        if (actor.getAccountStatus() != AccountStatus.ACCEPTED
+                || actor.isBlocked()
+                || actor.getRole() == null
+                || actor.getRole().getCode() != RoleCode.MSU_ADMIN
+                || actor.getRegion() == null
+                || actor.getMsu() == null
+                || actor.getMsu().getRegion() == null
+                || !actor.getRegion().getId().equals(
+                actor.getMsu().getRegion().getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Доступно только действующему администратору своего МСУ.");
+        }
+    }
+
     @PreAuthorize("@roleAccess.isRegionAdmin(authentication)")
     public List<Msu> getAllForRegionAdmin(Long actorId) {
         User actor = getUser(actorId);
@@ -174,7 +226,20 @@ public class MsuService {
         // Проверяем, что МСУ относится к региону текущего администратора.
         findMsuInRegion(msuId, regionId);
 
-        Specification<EducationalOrganization> specification = (root, query, cb) -> {
+        return searchEducationalOrganizations(
+                msuId,
+                regionId,
+                search,
+                page,
+                size
+        );
+    }
+
+    private Page<EducationalOrganization> searchEducationalOrganizations(Long msuId, Long regionId, String search, int page, int size) {
+        String normalizedSearch = search == null ? "" : search.trim();
+
+        Specification<EducationalOrganization> specification =
+                (root, query, cb) -> {
                     List<Predicate> predicates = new ArrayList<>();
                     predicates.add(cb.equal(root.get("msu").get("id"), msuId));
                     predicates.add(cb.equal(root.get("msu").get("region").get("id"), regionId));
@@ -224,6 +289,7 @@ public class MsuService {
     private void checkRegionAdmin(User actor) {
         if (actor.getAccountStatus() != AccountStatus.ACCEPTED
                 || actor.isBlocked()
+                || actor.getRole() == null
                 || actor.getRole().getCode() != RoleCode.REGION_ADMIN
                 || actor.getRegion() == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Создавать МСУ может только действующий администратор региона.");

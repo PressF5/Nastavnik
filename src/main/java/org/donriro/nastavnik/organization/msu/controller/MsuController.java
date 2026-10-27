@@ -60,15 +60,33 @@ public class MsuController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/current")
+    public ResponseEntity<MsuResponse> getCurrentMsu(@AuthenticationPrincipal CustomUserDetails principal) {
+        Msu msu = msuService.getCurrentMsuForMsuAdmin(principal.getUser().getId());
+
+        return ResponseEntity.ok(toResponse(msu));
+    }
+
+    @GetMapping("/current/educational-organizations")
+    public ResponseEntity<Page<EducationalOrganizationResponse>>
+    getCurrentMsuEducationalOrganizations(
+            @AuthenticationPrincipal CustomUserDetails principal,
+            @RequestParam(defaultValue = "") String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        Page<EducationalOrganizationResponse> response = msuService
+                .getEducationalOrganizationsForMsuAdmin(principal.getUser().getId(), search, page, size)
+                .map(this::toEducationalOrganizationResponse);
+
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<MsuResponse> getById(
             @AuthenticationPrincipal CustomUserDetails principal,
-            @PathVariable Long id
-    ) {
-        Msu msu = msuService.getByIdForRegionAdmin(
-                principal.getUser().getId(),
-                id
-        );
+            @PathVariable Long id) {
+        Msu msu = msuService.getByIdForRegionAdmin(principal.getUser().getId(), id);
 
         return ResponseEntity.ok(toResponse(msu));
     }
