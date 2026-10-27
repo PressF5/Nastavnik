@@ -4,12 +4,13 @@ import org.donriro.nastavnik.organization.educationalorganization.entity.Educati
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
 @Repository
-public interface EducationalOrganizationRepository extends JpaRepository<EducationalOrganization, Long> {
+public interface EducationalOrganizationRepository extends JpaRepository<EducationalOrganization, Long>, JpaSpecificationExecutor<EducationalOrganization> {
     boolean existsByMsuIdAndCodeAndIdNot(Long msuId, Integer code, Long id);
     boolean existsByMsuId(Long msuId);
     List<EducationalOrganization> findAllByMsuIdOrderByNameAsc(Long msuId);

@@ -78,14 +78,18 @@ public class MsuController {
     getEducationalOrganizations(
             @AuthenticationPrincipal CustomUserDetails principal,
             @PathVariable Long id,
+            @RequestParam(defaultValue = "") String search,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "10") int size
+    ) {
         Page<EducationalOrganizationResponse> response = msuService
                 .getEducationalOrganizationsForRegionAdmin(
                         principal.getUser().getId(),
                         id,
+                        search,
                         page,
-                        size)
+                        size
+                )
                 .map(this::toEducationalOrganizationResponse);
 
         return ResponseEntity.ok(response);

@@ -160,20 +160,44 @@ public class MsuService {
 
     /**
      * Получает страницу образовательных организаций выбранного МСУ.
+     * Поиск выполняется по названию и коду ОО.
      */
     @PreAuthorize("@roleAccess.isRegionAdmin(authentication)")
-    public Page<EducationalOrganization> getEducationalOrganizationsForRegionAdmin(Long actorId, Long msuId, int page, int size) {
+    public Page<EducationalOrganization> getEducationalOrganizationsForRegionAdmin(Long actorId, Long msuId, String search, int page, int size) {
         User actor = getUser(actorId);
         checkRegionAdmin(actor);
         validatePagination(page, size);
 
         Long regionId = actor.getRegion().getId();
+        String normalizedSearch = search == null ? "" : search.trim();
 
-        // Не раскрываем сведения о МСУ из чужого региона.
+        // Проверяем, что МСУ относится к региону текущего администратора.
         findMsuInRegion(msuId, regionId);
 
-        return educationalOrganizationRepository
-                .findAllByMsu_IdAndMsu_Region_IdOrderByNameAsc(msuId, regionId, PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "name")));
+        Specification<EducationalOrganization> specification = (root, query, cb) -> {
+                    List<Predicate> predicates = new ArrayList<>();
+                    predicates.add(cb.equal(root.get("msu").get("id"), msuId));
+                    predicates.add(cb.equal(root.get("msu").get("region").get("id"), regionId));
+
+                    if (!normalizedSearch.isEmpty()) {
+                        String pattern = "%" + normalizedSearch.toLowerCase(Locale.ROOT) + "%";
+                        Predicate nameMatch = cb.like(cb.lower(root.get("name")), pattern);
+
+                        try {
+                            Integer code = Integer.valueOf(normalizedSearch);
+                            Predicate codeMatch = cb.equal(root.get("code"), code);
+                            predicates.add(cb.or(nameMatch, codeMatch));
+                        } catch (NumberFormatException ignored) {
+                            predicates.add(nameMatch);
+                        }
+                    }
+
+                    return cb.and(predicates.toArray(Predicate[]::new));
+                };
+
+        return educationalOrganizationRepository.findAll(
+                specification,
+                PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "name")));
     }
 
     private Msu findMsuInRegion(Long msuId, Long regionId) {
