@@ -21,7 +21,6 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     boolean existsByEmail(String email);
     boolean existsByRoleCode(RoleCode roleCode);
     boolean existsByRoleCodeAndMsuId(RoleCode roleCode, Long msuId);
-    boolean existsByRoleCodeAndEducationalOrganizationId(RoleCode roleCode, Long educationalOrganizationId);
     boolean existsByEducationalOrganizationId(Long educationalOrganizationId);
     boolean existsByRoleCodeAndMsuIdAndAccountStatusIn(RoleCode roleCode, Long id, List<AccountStatus> activeAdminStatuses);
     boolean existsByRoleCodeAndEducationalOrganizationIdAndAccountStatusIn(RoleCode roleCode, Long educationalOrganizationId, List<AccountStatus> statuses);
