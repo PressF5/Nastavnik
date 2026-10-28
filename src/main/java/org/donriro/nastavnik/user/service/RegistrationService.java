@@ -138,8 +138,11 @@ public class RegistrationService {
     }
 
     private void checkOoAdminUniqueness(EducationalOrganization educationalOrganization) {
-        if (userRepository.existsByRoleCodeAndEducationalOrganizationId(RoleCode.OO_ADMIN, educationalOrganization.getId())) {
-            throw new AdministratorAlreadyExistsException("Для данной образовательной организации уже существует администратор.");
+        boolean exists = userRepository
+                .existsByRoleCodeAndEducationalOrganizationIdAndAccountStatusIn(RoleCode.OO_ADMIN, educationalOrganization.getId(), ACTIVE_ADMIN_STATUSES);
+
+        if (exists) {
+            throw new AdministratorAlreadyExistsException("Для данной образовательной организации уже существует заявка администратора в статусе PENDING или ACCEPTED.");
         }
     }
 
