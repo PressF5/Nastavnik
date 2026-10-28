@@ -23,6 +23,7 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     boolean existsByRoleCodeAndMsuId(RoleCode roleCode, Long msuId);
     boolean existsByRoleCodeAndEducationalOrganizationId(RoleCode roleCode, Long educationalOrganizationId);
     boolean existsByEducationalOrganizationId(Long educationalOrganizationId);
+    boolean existsByRoleCodeAndMsuIdAndAccountStatusIn(RoleCode roleCode, Long id, List<AccountStatus> activeAdminStatuses);
     Optional<User> findByEmail(String email);
     List<User> findAllByRoleCode(RoleCode roleCode);
     List<User> findAllByMsuId(Long msuId);
@@ -39,7 +40,6 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
         where u.email = :email
         """)
     Optional<User> findByEmailWithSecurityData(@Param("email") String email);
-
 
     /**
      * Возвращает подтверждённых и незаблокированных наставников

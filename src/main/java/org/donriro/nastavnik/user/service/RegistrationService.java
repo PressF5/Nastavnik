@@ -18,12 +18,15 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class RegistrationService {
+
+    private static final List<AccountStatus> ACTIVE_ADMIN_STATUSES = List.of(AccountStatus.PENDING, AccountStatus.ACCEPTED);
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
@@ -57,22 +60,21 @@ public class RegistrationService {
     }
 
     private User registerMsuAdmin(RegistrationRequest request, String email, Role role) {
-        Msu msu = getMsu(request.msuId());
+        Msu msu = msuRepository.findByIdForUpdate(request.msuId())
+                .orElseThrow(() -> new MsuNotFoundException("МСУ не найдено: " + request.msuId()));
         checkMsuAdminUniqueness(msu);
-
         User user = buildUser(request, email, role, msu.getRegion(), msu, null);
 
         return userRepository.save(user);
     }
 
     private User registerOoAdmin(RegistrationRequest request, String email, Role role) {
-        EducationalOrganization educationalOrganization = getEducationalOrganization(request.educationalOrganizationId(), request.msuId());
-        Msu msu = educationalOrganization.getMsu();
-        Region region = msu.getRegion();
-
-        checkOoAdminUniqueness(educationalOrganization);
-
-        User user = buildUser(request, email, role, region, msu, educationalOrganization);
+        EducationalOrganization organization = educationalOrganizationRepository
+                        .findByIdAndMsuIdForUpdate(request.educationalOrganizationId(), request.msuId())
+                        .orElseThrow(() -> new EducationalOrganizationNotFoundException("Образовательная организация не найдена или не принадлежит указанному МСУ."));
+        checkOoAdminUniqueness(organization);
+        Msu msu = organization.getMsu();
+        User user = buildUser(request, email, role, msu.getRegion(), msu, organization);
 
         return userRepository.save(user);
     }
@@ -127,8 +129,11 @@ public class RegistrationService {
     }
 
     private void checkMsuAdminUniqueness(Msu msu) {
-        if (userRepository.existsByRoleCodeAndMsuId(RoleCode.MSU_ADMIN, msu.getId())) {
-            throw new AdministratorAlreadyExistsException("Для данного МСУ уже существует администратор.");
+        boolean exists = userRepository
+                .existsByRoleCodeAndMsuIdAndAccountStatusIn(RoleCode.MSU_ADMIN, msu.getId(), ACTIVE_ADMIN_STATUSES);
+
+        if (exists) {
+            throw new AdministratorAlreadyExistsException("Для данного МСУ уже существует заявка администратора в статусе PENDING или ACCEPTED.");
         }
     }
 

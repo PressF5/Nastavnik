@@ -71,3 +71,6 @@ databaseChangeLog:
 
   - include:
       file: db/changelog/023-create-profile-matching-rule.sql
+
+  - include:
+      file: db/changelog/024-update-admin-registration-uniqueness.sql
