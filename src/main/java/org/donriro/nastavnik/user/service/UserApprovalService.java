@@ -250,7 +250,7 @@ public class UserApprovalService {
         RoleCode targetRole = target.getRole().getCode();
 
         return switch (actorRole) {
-            case REGION_ADMIN -> targetRole == RoleCode.MSU_ADMIN && sameRegion(actor, target);
+            case REGION_ADMIN -> (targetRole == RoleCode.MSU_ADMIN || targetRole == RoleCode.OO_ADMIN) && sameRegion(actor, target);
             case MSU_ADMIN -> (targetRole == RoleCode.OO_ADMIN || targetRole == RoleCode.MENTOR) && sameMsu(actor, target);
             case OO_ADMIN -> targetRole == RoleCode.MENTEE && sameOrganization(actor, target);
             default -> false;
