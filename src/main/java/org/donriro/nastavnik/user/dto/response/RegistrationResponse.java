@@ -12,10 +12,25 @@ public record RegistrationResponse(
         String middleName,
         boolean isBlock,
         RoleCode role,
-        AccountStatus accountStatus
+        AccountStatus accountStatus,
+        String educationalOrganizationName,
+        String msuName
 ) {
 
     public static RegistrationResponse from(User user) {
+        String educationalOrganizationName = user.getEducationalOrganization() != null
+                ? user.getEducationalOrganization().getName()
+                : null;
+
+        // Для пользователей, связанных с ОО, получаем МСУ через ОО.
+        // Для остальных ролей используем прямую связь User.msu.
+        String msuName = user.getEducationalOrganization() != null
+                && user.getEducationalOrganization().getMsu() != null
+                ? user.getEducationalOrganization().getMsu().getName()
+                : user.getMsu() != null
+                ? user.getMsu().getName()
+                : null;
+
         return new RegistrationResponse(
                 user.getId(),
                 user.getEmail(),
@@ -24,7 +39,9 @@ public record RegistrationResponse(
                 user.getMiddleName(),
                 user.isBlocked(),
                 user.getRole().getCode(),
-                user.getAccountStatus()
+                user.getAccountStatus(),
+                educationalOrganizationName,
+                msuName
         );
     }
 }

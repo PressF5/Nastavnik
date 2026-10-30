@@ -106,7 +106,10 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
             @Param("accountStatus") AccountStatus accountStatus,
             @Param("excludedStatuses") List<MentorshipStatus> excludedStatuses
     );
-    @EntityGraph(attributePaths = {"role", "region", "msu", "educationalOrganization"})
+    @EntityGraph(attributePaths = {"role", "region", "msu", "educationalOrganization", "educationalOrganization.msu"})
     @Override
     Page<User> findAll(Specification<User> spec, Pageable pageable);
+    @EntityGraph(attributePaths = {"role", "region", "msu", "educationalOrganization", "educationalOrganization.msu"})
+    @Query("select u from User u where u.id = :id")
+    Optional<User> findByIdWithRegistrationDetails(@Param("id") Long id);
 }

@@ -278,7 +278,7 @@ public class UserApprovalService {
     }
 
     private User getUser(Long id) {
-        return userRepository.findById(id)
+        return userRepository.findByIdWithRegistrationDetails(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Пользователь не найден: " + id));
     }
 }
