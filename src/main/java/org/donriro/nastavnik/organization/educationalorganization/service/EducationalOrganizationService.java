@@ -1,5 +1,6 @@
 package org.donriro.nastavnik.organization.educationalorganization.service;
 
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.donriro.nastavnik.organization.educationalorganization.dto.request.CreateEducationalOrganizationRequest;
 import org.donriro.nastavnik.organization.educationalorganization.dto.request.UpdateEducationalOrganizationRequest;
@@ -11,11 +12,19 @@ import org.donriro.nastavnik.user.entity.User;
 import org.donriro.nastavnik.user.repository.UserRepository;
 import org.donriro.nastavnik.user.role.RoleCode;
 import org.donriro.nastavnik.user.status.AccountStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -101,6 +110,54 @@ public class EducationalOrganizationService {
         }
 
         educationalOrganizationRepository.delete(organization);
+    }
+
+    /**
+     * Возвращает страницу всех образовательных организаций
+     * региона текущего регионального администратора.
+     *
+     * Поиск выполняется по названию и коду ОО.
+     */
+    @PreAuthorize("@roleAccess.isRegionAdmin(authentication)")
+    public Page<EducationalOrganization> getPageForRegionAdmin(Long actorId, String search, int page, int size) {
+        User actor = getUser(actorId);
+        checkAdministrator(actor);
+
+        if (actor.getRole().getCode() != RoleCode.REGION_ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Доступно только администратору региона.");
+        }
+
+        if (page < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Номер страницы не может быть отрицательным.");
+        }
+
+        if (size != 10 && size != 20 && size != 50) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Размер страницы должен быть 10, 20 или 50.");
+        }
+
+        Long regionId = actor.getRegion().getId();
+        String normalizedSearch = search == null ? "" : search.trim();
+
+        Specification<EducationalOrganization> specification =
+                (root, query, cb) -> {
+                    List<Predicate> predicates = new ArrayList<>();
+                    // Только ОО региона текущего администратора.
+                    predicates.add(cb.equal(root.get("msu").get("region").get("id"), regionId));
+
+                    if (!normalizedSearch.isEmpty()) {
+                        String pattern = "%" + normalizedSearch.toLowerCase(Locale.ROOT) + "%";
+                        Predicate nameMatch = cb.like(cb.lower(root.get("name")), pattern);
+                        try {
+                            Integer code = Integer.valueOf(normalizedSearch);
+                            predicates.add(cb.or(nameMatch, cb.equal(root.get("code"), code)));
+                        } catch (NumberFormatException ignored) {
+                            predicates.add(nameMatch);
+                        }
+                    }
+                    return cb.and(predicates.toArray(Predicate[]::new));
+                };
+
+        return educationalOrganizationRepository.findAll(specification, PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "name")));
     }
 
     private EducationalOrganization getOrganization(Long organizationId) {

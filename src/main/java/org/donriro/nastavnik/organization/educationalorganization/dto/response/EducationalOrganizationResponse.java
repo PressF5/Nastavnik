@@ -4,6 +4,6 @@ public record EducationalOrganizationResponse(
         Long id,
         Integer code,
         String name,
-        Long msuId
-) {
-}
+        Long msuId,
+        String msuName
+) {}

@@ -128,7 +128,8 @@ public class MsuController {
                 organization.getId(),
                 organization.getCode(),
                 organization.getName(),
-                organization.getMsu().getId()
+                organization.getMsu().getId(),
+                organization.getMsu().getName()
         );
     }
 }
