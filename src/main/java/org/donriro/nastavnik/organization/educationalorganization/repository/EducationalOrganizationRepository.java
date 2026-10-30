@@ -6,10 +6,8 @@ import org.donriro.nastavnik.user.role.RoleCode;
 import org.donriro.nastavnik.user.status.AccountStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
-import org.springframework.data.jpa.repository.Lock;
-import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
@@ -64,4 +62,7 @@ public interface EducationalOrganizationRepository extends JpaRepository<Educati
             @Param("id") Long id,
             @Param("msuId") Long msuId
     );
+
+    @EntityGraph(attributePaths = {"msu"})
+    Page<EducationalOrganization> findAll(Specification<EducationalOrganization> specification, Pageable pageable);
 }

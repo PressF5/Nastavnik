@@ -121,11 +121,7 @@ public class EducationalOrganizationService {
     @PreAuthorize("@roleAccess.isRegionAdmin(authentication)")
     public Page<EducationalOrganization> getPageForRegionAdmin(Long actorId, String search, int page, int size) {
         User actor = getUser(actorId);
-        checkAdministrator(actor);
-
-        if (actor.getRole().getCode() != RoleCode.REGION_ADMIN) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Доступно только администратору региона.");
-        }
+        checkRegionAdmin(actor);
 
         if (page < 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Номер страницы не может быть отрицательным.");
@@ -158,6 +154,16 @@ public class EducationalOrganizationService {
                 };
 
         return educationalOrganizationRepository.findAll(specification, PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "name")));
+    }
+
+    private void checkRegionAdmin(User actor) {
+        if (actor.getAccountStatus() != AccountStatus.ACCEPTED
+                || actor.isBlocked()
+                || actor.getRole() == null
+                || actor.getRole().getCode() != RoleCode.REGION_ADMIN
+                || actor.getRegion() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Доступно только действующему администратору региона.");
+        }
     }
 
     private EducationalOrganization getOrganization(Long organizationId) {
