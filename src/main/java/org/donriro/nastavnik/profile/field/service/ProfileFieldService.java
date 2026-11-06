@@ -159,10 +159,6 @@ public class ProfileFieldService {
                 .orElseThrow(() -> new ProfileFieldNotFoundException("Поле профиля с id=" + fieldId + " не найдено."));
 
         field.setActive(false);
-        field.setMatchingEnabled(false);
-
-        // Не оставляем активное правило для неактивного поля.
-        deactivateMatchingRule(field.getId());
     }
 
     @Transactional
