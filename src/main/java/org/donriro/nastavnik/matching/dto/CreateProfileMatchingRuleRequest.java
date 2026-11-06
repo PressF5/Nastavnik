@@ -17,9 +17,9 @@ public record CreateProfileMatchingRuleRequest(
         ComparisonType comparisonType,
 
         @NotNull
-        @DecimalMin("0.01")
-        @DecimalMax("100.00")
-        @Digits(integer = 3, fraction = 2)
+        @DecimalMin("1")
+        @DecimalMax("10")
+        @Digits(integer = 2, fraction = 0)
         BigDecimal weight
 
 ) {

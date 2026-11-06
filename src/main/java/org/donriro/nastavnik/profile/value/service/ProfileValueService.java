@@ -81,7 +81,7 @@ public class ProfileValueService {
         User user = getCurrentUserFromDatabase();
 
         List<ProfileFieldRole> assignments = profileFieldRoleRepository
-                        .findAllByRole_CodeAndProfileField_ActiveTrueOrderBySortOrderAsc(user.getRole().getCode());
+                        .findAllByRole_CodeAndProfileField_ActiveTrueOrderBySortOrderAscProfileField_IdAsc(user.getRole().getCode());
 
         Map<Long, ProfileFieldRole> assignmentsByFieldId =
                 assignments.stream()

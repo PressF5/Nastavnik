@@ -3,8 +3,10 @@ package org.donriro.nastavnik.profile.field.service;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import lombok.RequiredArgsConstructor;
-import org.donriro.nastavnik.matching.repository.ProfileMatchingRuleRepository;
-import org.donriro.nastavnik.profile.field.dto.*;
+import org.donriro.nastavnik.profile.field.dto.CreateProfileFieldRequest;
+import org.donriro.nastavnik.profile.field.dto.ProfileFieldResponse;
+import org.donriro.nastavnik.profile.field.dto.ProfileFieldRoleRequest;
+import org.donriro.nastavnik.profile.field.dto.UpdateProfileFieldRequest;
 import org.donriro.nastavnik.profile.field.entity.ProfileField;
 import org.donriro.nastavnik.profile.field.entity.ProfileFieldRole;
 import org.donriro.nastavnik.profile.field.entity.ProfileFieldRoleId;
@@ -43,7 +45,6 @@ public class ProfileFieldService {
     private final ProfileFieldRoleRepository profileFieldRoleRepository;
     private final RoleRepository roleRepository;
     private final ProfileFieldOptionService profileFieldOptionService;
-    private final ProfileMatchingRuleRepository profileMatchingRuleRepository;
 
     private final EntityManager entityManager;
 
@@ -129,10 +130,6 @@ public class ProfileFieldService {
                 .containsAll(Set.of(RoleCode.MENTOR, RoleCode.MENTEE));
 
         field.setMatchingEnabled(request.matchingEnabled() && assignedToBoth);
-        // Если поле больше не участвует в подборе,деактивируем связанное правило.
-        if (!field.isMatchingEnabled()) {
-            deactivateMatchingRule(field.getId());
-        }
 
         /*
          * Назначения profile_field_role тоже должны учитываться
@@ -209,7 +206,7 @@ public class ProfileFieldService {
         RoleCode roleCode = isMentor ? RoleCode.MENTOR : RoleCode.MENTEE;
 
         return profileFieldRoleRepository
-                .findAllByRole_CodeAndProfileField_ActiveTrueOrderBySortOrderAsc(roleCode)
+                .findAllByRole_CodeAndProfileField_ActiveTrueOrderBySortOrderAscProfileField_IdAsc(roleCode)
                 .stream()
                 .map(assignment -> toFormResponse(assignment.getProfileField(), assignment))
                 .toList();
@@ -397,12 +394,6 @@ public class ProfileFieldService {
         if (!assignedToMentor || !assignedToMentee) {
             field.setMatchingEnabled(false);
         }
-    }
-
-    private void deactivateMatchingRule(Long profileFieldId) {
-        profileMatchingRuleRepository
-                .findByProfileField_Id(profileFieldId)
-                .ifPresent(rule -> rule.setActive(false));
     }
 
     private void validateOptions(ProfileFieldType fieldType, List<ProfileFieldOptionRequest> options) {

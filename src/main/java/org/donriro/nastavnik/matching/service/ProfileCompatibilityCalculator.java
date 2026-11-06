@@ -127,9 +127,9 @@ public class ProfileCompatibilityCalculator {
         return switch (fieldType) {
             case TEXT, TEXTAREA -> value.getValueText() != null && !value.getValueText().isBlank();
             case NUMBER -> value.getValueNumber() != null;
-            case DATE -> value.getValueDate() != null;
             case BOOLEAN -> value.getValueBoolean() != null;
             case SELECT, MULTISELECT -> !loadSelectedOptionIds(value).isEmpty();
+            case DATE -> false;
         };
     }
 

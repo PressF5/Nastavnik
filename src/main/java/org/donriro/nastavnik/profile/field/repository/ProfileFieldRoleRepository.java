@@ -12,5 +12,5 @@ import java.util.List;
 public interface ProfileFieldRoleRepository extends JpaRepository<ProfileFieldRole, ProfileFieldRoleId> {
     List<ProfileFieldRole> findAllByProfileField_Id(Long profileFieldId);
     boolean existsByProfileField_IdAndRole_Code(Long profileFieldId, RoleCode roleCode);
-    List<ProfileFieldRole> findAllByRole_CodeAndProfileField_ActiveTrueOrderBySortOrderAsc(RoleCode roleCode);
+    List<ProfileFieldRole> findAllByRole_CodeAndProfileField_ActiveTrueOrderBySortOrderAscProfileField_IdAsc(RoleCode roleCode);
 }

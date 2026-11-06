@@ -77,3 +77,6 @@ databaseChangeLog:
 
   - include:
       file: db/changelog/025-unique-occupied-mentee.sql
+
+  - include:
+      file: db/changelog/026-limit-profile-matching-rule-weight.sql
