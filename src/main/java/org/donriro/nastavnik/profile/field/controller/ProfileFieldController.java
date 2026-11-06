@@ -19,11 +19,13 @@ import java.util.List;
 public class ProfileFieldController {
     private final ProfileFieldService profileFieldService;
 
+    @PreAuthorize("hasRole('REGION_ADMIN')")
     @GetMapping
     public ResponseEntity<List<ProfileFieldResponse>> getAll() {
         return ResponseEntity.ok(profileFieldService.getAll());
     }
 
+    @PreAuthorize("hasRole('REGION_ADMIN')")
     @GetMapping("/{id}")
     public ResponseEntity<ProfileFieldResponse> getById(@PathVariable Long id) {
         ProfileFieldResponse response = profileFieldService.getById(id);
