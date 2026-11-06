@@ -112,15 +112,15 @@ public class ProfileFieldService {
             if (isChoiceField(currentType) && !isChoiceField(requestedType) && hasOptions) {
                 throw new ProfileFieldTypeChangeNotAllowedException("Нельзя изменить тип поля, пока у него существуют варианты.");
             }
-
-            if (!isChoiceField(currentType) && isChoiceField(requestedType)) {
-                throw new ProfileFieldOptionsRequiredException("Для перехода к SELECT или MULTISELECT необходимо предусмотреть передачу вариантов поля.");
-            }
         }
 
         field.setName(request.name().trim());
         field.setFieldType(request.fieldType());
         field.setSearchable(request.searchable());
+
+        if (isChoiceField(requestedType)) {
+            profileFieldOptionService.replaceAllForField(field, request.options());
+        }
 
         replaceRoles(field, request.roles());
 
@@ -286,6 +286,8 @@ public class ProfileFieldService {
         if (request.matchingEnabled() && !roleCodes.containsAll(Set.of(RoleCode.MENTOR, RoleCode.MENTEE))) {
             throw new IllegalArgumentException("Для участия в подборе поле должно быть назначено обеим ролям.");
         }
+
+        validateOptions(request.fieldType(), request.options());
     }
 
     private void applyRequest(ProfileField field, CreateProfileFieldRequest request) {

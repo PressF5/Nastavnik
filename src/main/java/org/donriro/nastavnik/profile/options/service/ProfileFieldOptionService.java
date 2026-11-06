@@ -13,9 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -152,6 +150,68 @@ public class ProfileFieldOptionService {
 
     public boolean hasOptions(Long fieldId) {
         return optionRepository.existsByProfileField_Id(fieldId);
+    }
+
+    /**
+     * Синхронизирует варианты ответа при редактировании поля.
+     *
+     * Отсутствующие в запросе активные варианты деактивируются.
+     * Существующие варианты обновляются.
+     * Ранее деактивированные варианты повторно активируются,
+     * если пользователь добавил их снова.
+     *
+     * Физическое удаление вариантов не выполняется.
+     */
+    @Transactional
+    public void replaceAllForField(ProfileField field, List<ProfileFieldOptionRequest> requests) {
+        validateFieldType(field);
+
+        if (requests == null || requests.isEmpty()) {
+            throw new IllegalArgumentException("Для поля типа SELECT или MULTISELECT необходимо указать хотя бы один вариант.");
+        }
+
+        Map<String, ProfileFieldOption> existingByValue = new HashMap<>();
+        List<ProfileFieldOption> existingOptions = optionRepository.findAllByProfileField_Id(field.getId());
+
+        for (ProfileFieldOption option : existingOptions) {
+            existingByValue.put(option.getValue(), option);
+        }
+
+        Set<String> requestedValues = new HashSet<>();
+        List<ProfileFieldOption> optionsToSave = new java.util.ArrayList<>();
+
+        for (ProfileFieldOptionRequest request : requests) {
+            validateOptionRequest(request);
+
+            String value = request.value().trim();
+
+            if (!requestedValues.add(value)) {
+                throw new IllegalArgumentException("Варианты одного поля не должны содержать повторяющиеся value: " + value);
+            }
+
+            ProfileFieldOption option = existingByValue.get(value);
+
+            if (option == null) {
+                option = new ProfileFieldOption();
+                option.setProfileField(field);
+                option.setValue(value);
+            }
+
+            option.setLabel(request.label().trim());
+            option.setSortOrder(request.sortOrder());
+            option.setActive(true);
+
+            optionsToSave.add(option);
+        }
+
+        // Варианты, которых больше нет в запросе, деактивируем.
+        for (ProfileFieldOption option : existingOptions) {
+            if (!requestedValues.contains(option.getValue())) {
+                option.setActive(false);
+            }
+        }
+
+        optionRepository.saveAll(optionsToSave);
     }
 
     private ProfileField getField(Long fieldId) {

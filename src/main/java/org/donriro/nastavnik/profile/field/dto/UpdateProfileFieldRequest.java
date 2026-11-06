@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import org.donriro.nastavnik.profile.field.type.ProfileFieldType;
+import org.donriro.nastavnik.profile.options.dto.ProfileFieldOptionRequest;
 
 import java.util.List;
 
@@ -28,7 +29,8 @@ public record UpdateProfileFieldRequest(
         @Size(min = 1, max = 2)
         List<@Valid ProfileFieldRoleRequest> roles,
 
-        boolean matchingEnabled
+        boolean matchingEnabled,
 
+        List<@Valid ProfileFieldOptionRequest> options
 ) {
 }
