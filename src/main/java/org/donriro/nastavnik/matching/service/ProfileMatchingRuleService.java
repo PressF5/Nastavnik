@@ -59,6 +59,9 @@ public class ProfileMatchingRuleService {
 
     @Transactional
     public ProfileMatchingRuleResponse update(Long id, UpdateProfileMatchingRuleRequest request) {
+        if (request == null) {
+            throw new InvalidProfileMatchingRuleException("Данные правила не должны быть null.");
+        }
         ProfileMatchingRule rule = ruleRepository.findById(id)
                 .orElseThrow(() -> new ProfileMatchingRuleNotFoundException("Правило подбора с id " + id + " не найдено."));
         ProfileField field = rule.getProfileField();

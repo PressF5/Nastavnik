@@ -54,7 +54,7 @@ public class ProfileFieldController {
     }
 
     @PreAuthorize("hasRole('REGION_ADMIN')")
-    @DeleteMapping("/{id}")
+    @PatchMapping("/{id}/deactivate")
     public ResponseEntity<Void> deactivate(@PathVariable Long id) {
         profileFieldService.deactivate(id);
         return ResponseEntity.noContent().build();
