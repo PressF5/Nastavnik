@@ -177,7 +177,7 @@ public class ProfileFieldService {
     }
 
     public List<ProfileFieldResponse> getAll() {
-        return profileFieldRepository.findAll()
+        return profileFieldRepository.findAllByOrderByIdAsc()
                 .stream()
                 .map(this::toResponse)
                 .toList();
