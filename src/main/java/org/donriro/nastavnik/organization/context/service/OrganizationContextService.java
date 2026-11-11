@@ -11,7 +11,6 @@ import org.donriro.nastavnik.user.repository.UserRepository;
 import org.donriro.nastavnik.user.role.RoleCode;
 import org.donriro.nastavnik.user.status.AccountStatus;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -23,9 +22,8 @@ public class OrganizationContextService {
 
     private final UserRepository userRepository;
 
-    @PreAuthorize("@roleAccess.isRegionAdmin(authentication) or @roleAccess.isMsuAdmin(authentication) or @roleAccess.isOoAdmin(authentication)")
     public OrganizationContextResponse getCurrent(Long userId) {
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdWithOrganizationContext(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Пользователь не найден."));
 
         checkActiveAccount(user);
@@ -35,43 +33,51 @@ public class OrganizationContextService {
         if (region == null) {
             throw forbidden();
         }
-
         OrganizationUnitResponse regionResponse = toResponse(region);
-
         RoleCode role = user.getRole().getCode();
 
         return switch (role) {
             case REGION_ADMIN -> new OrganizationContextResponse(regionResponse, null, null);
             case MSU_ADMIN -> {
                 Msu msu = user.getMsu();
-                if (msu == null || msu.getRegion() == null || !region.getId().equals(msu.getRegion().getId())) {
-                    throw forbidden();
-                }
-
+                validateMsu(user, msu);
                 yield new OrganizationContextResponse(regionResponse, toResponse(msu), null);
             }
-            case OO_ADMIN -> {
+            case OO_ADMIN, MENTOR, MENTEE -> {
+                Msu msu = user.getMsu();
                 EducationalOrganization organization = user.getEducationalOrganization();
-                if (organization == null || organization.getMsu() == null) {
-                    throw forbidden();
-                }
-
-                Msu msu = organization.getMsu();
-                if (msu.getRegion() == null
-                        || user.getMsu() == null
-                        || !user.getMsu().getId().equals(msu.getId())
-                        || !region.getId().equals(msu.getRegion().getId())) {
-                    throw forbidden();
-                }
+                validateMsu(user, msu);
+                validateOrganization(user, organization, msu);
 
                 yield new OrganizationContextResponse(regionResponse, toResponse(msu), toResponse(organization));
             }
-            default -> throw forbidden();
         };
     }
 
     private void checkActiveAccount(User user) {
-        if (user.getAccountStatus() != AccountStatus.ACCEPTED || user.isBlocked() || user.getRole() == null) {
+        if (user.getRole() == null
+                || user.getRole().getCode() == null
+                || user.getAccountStatus() != AccountStatus.ACCEPTED
+                || user.isBlocked()) {
+            throw forbidden();
+        }
+    }
+
+    private void validateMsu(User user, Msu msu) {
+        if (msu == null
+                || msu.getRegion() == null
+                || user.getRegion() == null
+                || !user.getRegion().getId().equals(msu.getRegion().getId())) {
+            throw forbidden();
+        }
+    }
+
+    private void validateOrganization(User user, EducationalOrganization organization, Msu msu) {
+        if (organization == null
+                || organization.getMsu() == null
+                || !msu.getId().equals(organization.getMsu().getId())
+                || !user.getEducationalOrganization().getId()
+                .equals(organization.getId())) {
             throw forbidden();
         }
     }

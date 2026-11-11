@@ -112,4 +112,20 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     @EntityGraph(attributePaths = {"role", "region", "msu", "educationalOrganization", "educationalOrganization.msu"})
     @Query("select u from User u where u.id = :id")
     Optional<User> findByIdWithRegistrationDetails(@Param("id") Long id);
+
+    /**
+     * Загружает пользователя вместе со всей организационной структурой.
+     */
+    @EntityGraph(attributePaths = {
+            "role",
+            "region",
+            "msu",
+            "msu.region",
+            "educationalOrganization",
+            "educationalOrganization.msu",
+            "educationalOrganization.msu.region"
+    })
+    @Query("select u from User u where u.id = :id")
+    Optional<User> findByIdWithOrganizationContext(@Param("id") Long id);
+
 }
