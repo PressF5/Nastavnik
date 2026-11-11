@@ -30,18 +30,18 @@ public interface EducationalOrganizationRepository extends JpaRepository<Educati
      * или подтверждённым аккаунтом.
      */
     @Query("""
-        select eo
-        from EducationalOrganization eo
-        where eo.msu.id = :msuId
-          and not exists (
-              select u.id
-              from User u
-              where u.role.code = :roleCode
-                and u.educationalOrganization.id = eo.id
-                and u.accountStatus in :statuses
-          )
-        order by eo.name
-    """)
+                select eo
+                from EducationalOrganization eo
+                where eo.msu.id = :msuId
+                  and not exists (
+                      select u.id
+                      from User u
+                      where u.role.code = :roleCode
+                        and u.educationalOrganization.id = eo.id
+                        and u.accountStatus in :statuses
+                  )
+                order by eo.name
+            """)
     List<EducationalOrganization> findAvailableForOoAdmin(
             @Param("msuId") Long msuId,
             @Param("roleCode") RoleCode roleCode,
@@ -53,15 +53,23 @@ public interface EducationalOrganizationRepository extends JpaRepository<Educati
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
-        select eo
-        from EducationalOrganization eo
-        where eo.id = :id
-          and eo.msu.id = :msuId
-    """)
+                select eo
+                from EducationalOrganization eo
+                where eo.id = :id
+                  and eo.msu.id = :msuId
+            """)
     Optional<EducationalOrganization> findByIdAndMsuIdForUpdate(
             @Param("id") Long id,
             @Param("msuId") Long msuId
     );
+
+    @Query("""
+                select eo
+                from EducationalOrganization eo
+                join fetch eo.msu
+                where eo.id = :id
+            """)
+    Optional<EducationalOrganization> findByIdWithMsu(@Param("id") Long id);
 
     @EntityGraph(attributePaths = {"msu"})
     Page<EducationalOrganization> findAll(Specification<EducationalOrganization> specification, Pageable pageable);

@@ -167,7 +167,7 @@ public class EducationalOrganizationService {
     }
 
     private EducationalOrganization getOrganization(Long organizationId) {
-        return educationalOrganizationRepository.findById(organizationId)
+        return educationalOrganizationRepository.findByIdWithMsu(organizationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Образовательная организация не найдена."));
     }
 
