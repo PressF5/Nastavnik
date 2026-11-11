@@ -92,11 +92,48 @@ public class UserApprovalService {
         return changeBlockedStatus(actorId, targetId, false);
     }
 
-    public Page<User> getUsers(Long actorId, RoleCode role, AccountStatus status, Boolean blocked, Pageable pageable) {
+    public Page<User> getUsers(Long actorId, RoleCode role, AccountStatus status, Boolean blocked, String search, Pageable pageable) {
         User actor = getUser(actorId);
 
         Specification<User> specification = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+
+            // Поиск по электронной почте и ФИО.
+            if (search != null && !search.isBlank()) {
+                String normalizedSearch = search.trim()
+                        .replaceAll("\\s+", " ")
+                        .toLowerCase();
+
+                String pattern = "%" + escapeLikePattern(normalizedSearch) + "%";
+
+                var emailExpression = cb.lower(root.get("email"));
+
+                var lastNameFirstName = cb.lower(
+                        cb.concat(
+                                cb.concat(root.get("lastName"), " "),
+                                cb.concat(
+                                        cb.concat(root.get("firstName"), " "),
+                                        cb.coalesce(root.get("middleName"), "")
+                                )
+                        )
+                );
+
+                var firstNameLastName = cb.lower(
+                        cb.concat(
+                                cb.concat(root.get("firstName"), " "),
+                                cb.concat(
+                                        cb.concat(root.get("lastName"), " "),
+                                        cb.coalesce(root.get("middleName"), "")
+                                )
+                        )
+                );
+
+                predicates.add(cb.or(
+                        cb.like(emailExpression, pattern, '\\'),
+                        cb.like(lastNameFirstName, pattern, '\\'),
+                        cb.like(firstNameLastName, pattern, '\\')
+                ));
+            }
 
             // Фильтр по роли.
             if (role != null) {
@@ -125,6 +162,13 @@ public class UserApprovalService {
         };
 
         return userRepository.findAll(specification, pageable);
+    }
+
+    private String escapeLikePattern(String value) {
+        return value
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
     }
 
     private User changeBlockedStatus(Long actorId, Long targetId, boolean newBlockedStatus) {

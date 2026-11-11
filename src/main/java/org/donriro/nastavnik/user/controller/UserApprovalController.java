@@ -29,9 +29,11 @@ public class UserApprovalController {
             @RequestParam(required = false) RoleCode role,
             @RequestParam(required = false) AccountStatus status,
             @RequestParam(required = false) Boolean blocked,
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             Authentication authentication) {
+
         if (page < 0) {
             throw new IllegalArgumentException("Номер страницы не может быть отрицательным.");
         }
@@ -42,7 +44,10 @@ public class UserApprovalController {
 
         CustomUserDetails principal = (CustomUserDetails) authentication.getPrincipal();
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "id"));
-        return userApprovalService.getUsers(principal.getUser().getId(), role, status, blocked, pageable).map(RegistrationResponse::from);
+
+        return userApprovalService
+                .getUsers(principal.getUser().getId(), role, status, blocked, search, pageable)
+                .map(RegistrationResponse::from);
     }
 
     @PatchMapping("/{id}/approve")
