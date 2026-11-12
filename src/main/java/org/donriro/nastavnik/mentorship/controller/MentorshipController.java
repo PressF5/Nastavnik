@@ -4,6 +4,11 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.donriro.nastavnik.mentorship.dto.*;
 import org.donriro.nastavnik.mentorship.service.MentorshipService;
+import org.donriro.nastavnik.mentorship.status.MentorshipStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -62,5 +67,26 @@ public class MentorshipController {
     @PreAuthorize("hasRole('OO_ADMIN')")
     public ResponseEntity<List<AvailableMenteeResponse>> getAvailableMentees() {
         return ResponseEntity.ok(mentorshipService.getAvailableMentees());
+    }
+
+    /**
+     * Список назначений наставничества наставляемых текущей ОО.
+     */
+    @GetMapping("/api/admin/mentorship-assignments")
+    @PreAuthorize("hasRole('OO_ADMIN')")
+    public ResponseEntity<Page<MentorshipResponse>> getOrganizationMentorships(
+            @RequestParam(required = false) MentorshipStatus status,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "9") int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.clamp(size, 1, 50);
+
+        Pageable pageable = PageRequest.of(
+                safePage,
+                safeSize,
+                Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        return ResponseEntity.ok(mentorshipService.getOrganizationMentorships(status, search, pageable));
     }
 }

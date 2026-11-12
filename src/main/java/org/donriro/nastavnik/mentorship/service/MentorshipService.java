@@ -18,6 +18,8 @@ import org.donriro.nastavnik.user.repository.UserRepository;
 import org.donriro.nastavnik.user.role.RoleCode;
 import org.donriro.nastavnik.user.status.AccountStatus;
 import org.donriro.nastavnik.user.status.AuditSource;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -342,6 +344,30 @@ public class MentorshipService {
                 .toList();
     }
 
+    /**
+     * Возвращает назначения наставничества наставляемых
+     * образовательной организации текущего администратора.
+     */
+    public Page<MentorshipResponse> getOrganizationMentorships(MentorshipStatus status, String search, Pageable pageable) {
+        User admin = getCurrentUser();
+
+        requireRole(admin, RoleCode.OO_ADMIN);
+        requireActiveAccount(admin);
+
+        if (admin.getEducationalOrganization() == null || admin.getMsu() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "У администратора не настроена организационная принадлежность.");
+        }
+
+        String normalizedSearch = search == null || search.isBlank() ? null : search.trim().toLowerCase();
+
+        return mentorshipRepository.findAllForOrganization(
+                        admin.getEducationalOrganization().getId(),
+                        status,
+                        normalizedSearch,
+                        pageable)
+                .map(this::toResponse);
+    }
+
     private void writeAudit(Mentorship mentorship, User actor, String action, MentorshipStatus oldStatus, MentorshipStatus newStatus, String comment) {
         MentorshipAuditLog auditLog = new MentorshipAuditLog();
 
@@ -382,7 +408,15 @@ public class MentorshipService {
 
                 mentorship.getCreatedAt(),
                 mentorship.getStartedAt(),
-                mentorship.getEndedAt()
+                mentorship.getEndedAt(),
+
+                mentor.getEducationalOrganization() != null
+                        ? mentor.getEducationalOrganization().getName()
+                        : null,
+
+                mentee.getEducationalOrganization() != null
+                        ? mentee.getEducationalOrganization().getName()
+                        : null
         );
     }
 

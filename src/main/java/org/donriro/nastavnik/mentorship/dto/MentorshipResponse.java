@@ -24,6 +24,9 @@ public record MentorshipResponse(
 
         Instant createdAt,
         Instant startedAt,
-        Instant endedAt
+        Instant endedAt,
+
+        String mentorEducationalOrganizationName,
+        String menteeEducationalOrganizationName
 ) {
 }
