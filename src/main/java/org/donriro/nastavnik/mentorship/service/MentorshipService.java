@@ -358,7 +358,7 @@ public class MentorshipService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "У администратора не настроена организационная принадлежность.");
         }
 
-        String normalizedSearch = search == null || search.isBlank() ? null : search.trim().toLowerCase();
+        String normalizedSearch = search == null || search.isBlank() ? "" : search.trim().toLowerCase();
 
         return mentorshipRepository.findAllForOrganization(
                         admin.getEducationalOrganization().getId(),

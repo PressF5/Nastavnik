@@ -43,7 +43,7 @@ public interface MentorshipRepository extends JpaRepository<Mentorship, Long> {
                 WHERE mentee.educationalOrganization.id = :organizationId
                   AND (:status IS NULL OR m.status = :status)
                   AND (
-                      :search IS NULL
+                      :search = ''
                       OR LOWER(
                           CONCAT(
                               CONCAT(
@@ -63,7 +63,6 @@ public interface MentorshipRepository extends JpaRepository<Mentorship, Long> {
                           )
                       ) LIKE LOWER(CONCAT('%', :search, '%'))
                   )
-                ORDER BY m.createdAt DESC
                 """,
             countQuery = """
                 SELECT COUNT(m)
@@ -73,7 +72,7 @@ public interface MentorshipRepository extends JpaRepository<Mentorship, Long> {
                 WHERE mentee.educationalOrganization.id = :organizationId
                   AND (:status IS NULL OR m.status = :status)
                   AND (
-                      :search IS NULL
+                      :search = ''
                       OR LOWER(
                           CONCAT(
                               CONCAT(
