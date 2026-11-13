@@ -97,4 +97,13 @@ public class MentorshipController {
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.<MentorshipResponse>noContent().build());
     }
+
+    /**
+     * Возвращает анкету наставника текущего наставляемого.
+     */
+    @GetMapping("/api/mentee/mentor")
+    @PreAuthorize("hasRole('MENTEE')")
+    public ResponseEntity<MentorProfileResponse> getCurrentMenteeMentorProfile() {
+        return ResponseEntity.ok(mentorshipService.getCurrentMenteeMentorProfile());
+    }
 }

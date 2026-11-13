@@ -292,6 +292,41 @@ public class MentorshipService {
     }
 
     /**
+     * Возвращает анкету наставника для текущего наставляемого.
+     * Доступ разрешён только при наличии собственного назначения.
+     */
+    public MentorProfileResponse getCurrentMenteeMentorProfile() {
+        User mentee = getCurrentUser();
+
+        requireRole(mentee, RoleCode.MENTEE);
+        requireActiveAccount(mentee);
+
+        Mentorship mentorship = mentorshipRepository
+                .findFirstByMentee_IdAndStatusInOrderByCreatedAtDesc(mentee.getId(), List.of(MentorshipStatus.PENDING, MentorshipStatus.ACCEPTED))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Назначение наставника не найдено."));
+
+        User mentor = mentorship.getMentor();
+
+        return new MentorProfileResponse(
+                mentor.getId(),
+                mentor.getFirstName(),
+                mentor.getLastName(),
+                mentor.getMiddleName(),
+                mentor.getRegion() != null
+                        ? mentor.getRegion().getName()
+                        : null,
+                mentor.getMsu() != null
+                        ? mentor.getMsu().getName()
+                        : null,
+                mentor.getEducationalOrganization() != null
+                        ? mentor.getEducationalOrganization().getName()
+                        : null,
+                toResponse(mentorship),
+                profileValueService.getAllForUser(mentor.getId())
+        );
+    }
+
+    /**
      * Завершает действующее наставничество.
      */
     @Transactional
