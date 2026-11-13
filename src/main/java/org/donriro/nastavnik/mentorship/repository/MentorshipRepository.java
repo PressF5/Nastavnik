@@ -99,4 +99,7 @@ public interface MentorshipRepository extends JpaRepository<Mentorship, Long> {
             @Param("status") MentorshipStatus status,
             @Param("search") String search,
             Pageable pageable);
+
+    // Текущее назначение наставляемого: ожидающее или действующее.
+    Optional<Mentorship> findFirstByMentee_IdAndStatusInOrderByCreatedAtDesc(Long menteeId, List<MentorshipStatus> statuses);
 }

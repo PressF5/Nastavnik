@@ -89,4 +89,12 @@ public class MentorshipController {
 
         return ResponseEntity.ok(mentorshipService.getOrganizationMentorships(status, search, pageable));
     }
+
+    @GetMapping("/api/mentee/mentorship")
+    @PreAuthorize("hasRole('MENTEE')")
+    public ResponseEntity<MentorshipResponse> getCurrentMenteeMentorship() {
+        return mentorshipService.getCurrentMenteeMentorship()
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.<MentorshipResponse>noContent().build());
+    }
 }

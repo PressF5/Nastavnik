@@ -30,6 +30,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -149,6 +150,23 @@ public class MentorshipService {
                 .stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    /**
+     * Возвращает текущее назначение наставничества
+     * для авторизованного наставляемого.
+     */
+    public Optional<MentorshipResponse> getCurrentMenteeMentorship() {
+        User mentee = getCurrentUser();
+
+        requireRole(mentee, RoleCode.MENTEE);
+        requireActiveAccount(mentee);
+
+        return mentorshipRepository
+                .findFirstByMentee_IdAndStatusInOrderByCreatedAtDesc(
+                        mentee.getId(),
+                        List.of(MentorshipStatus.PENDING, MentorshipStatus.ACCEPTED))
+                .map(this::toResponse);
     }
 
     /**
