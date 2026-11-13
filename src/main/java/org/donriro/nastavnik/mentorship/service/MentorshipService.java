@@ -424,6 +424,60 @@ public class MentorshipService {
                 .map(this::toResponse);
     }
 
+    /**
+     * Возвращает историю изменений назначения наставничества
+     * для администратора образовательной организации.
+     */
+    public List<MentorshipAuditLogResponse> getOrganizationMentorshipHistory(Long mentorshipId) {
+        User admin = getCurrentUser();
+
+        requireRole(admin, RoleCode.OO_ADMIN);
+        requireActiveAccount(admin);
+
+        if (admin.getEducationalOrganization() == null || admin.getMsu() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "У администратора не настроена организационная принадлежность.");
+        }
+
+        Mentorship mentorship = mentorshipRepository.findById(mentorshipId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Назначение наставничества не найдено."));
+
+        // Администратор может просматривать историю только своей ОО.
+        if (!sameOrganization(admin, mentorship.getMentee()) || !admin.getMsu().getId().equals(mentorship.getMsu().getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Нет доступа к истории этого назначения.");
+        }
+
+        return auditLogRepository
+                .findAllByMentorship_IdOrderByCreatedAtAsc(mentorshipId)
+                .stream()
+                .map(log -> {
+                    User actor = log.getActor();
+
+                    String actorName = actor == null
+                            ? "Система"
+                            : String.join(
+                            " ",
+                            java.util.stream.Stream.of(
+                                            actor.getLastName(),
+                                            actor.getFirstName(),
+                                            actor.getMiddleName()
+                                    )
+                                    .filter(value -> value != null && !value.isBlank())
+                                    .toList()
+                    );
+
+                    return new MentorshipAuditLogResponse(
+                            log.getId(),
+                            log.getAction(),
+                            log.getOldStatus(),
+                            log.getNewStatus(),
+                            log.getComment(),
+                            actorName.isBlank() ? "Система" : actorName,
+                            log.getSource(),
+                            log.getCreatedAt());
+                })
+                .toList();
+    }
+
     private void writeAudit(Mentorship mentorship, User actor, String action, MentorshipStatus oldStatus, MentorshipStatus newStatus, String comment) {
         MentorshipAuditLog auditLog = new MentorshipAuditLog();
 

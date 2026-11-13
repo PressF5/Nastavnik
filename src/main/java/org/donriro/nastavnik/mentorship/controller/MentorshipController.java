@@ -106,4 +106,14 @@ public class MentorshipController {
     public ResponseEntity<MentorProfileResponse> getCurrentMenteeMentorProfile() {
         return ResponseEntity.ok(mentorshipService.getCurrentMenteeMentorProfile());
     }
+
+    /**
+     * История изменений назначения наставничества
+     * в образовательной организации администратора.
+     */
+    @GetMapping("/api/admin/mentorship-assignments/{id}/history")
+    @PreAuthorize("hasRole('OO_ADMIN')")
+    public ResponseEntity<List<MentorshipAuditLogResponse>> getOrganizationMentorshipHistory(@PathVariable Long id) {
+        return ResponseEntity.ok(mentorshipService.getOrganizationMentorshipHistory(id));
+    }
 }
