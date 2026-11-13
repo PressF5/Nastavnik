@@ -11,6 +11,7 @@ public record MenteeProfileResponse(
         String lastName,
         String middleName,
         LocalDate birthDate,
+        String regionName,
         String msuName,
         String educationalOrganizationName,
         MentorshipResponse mentorship,

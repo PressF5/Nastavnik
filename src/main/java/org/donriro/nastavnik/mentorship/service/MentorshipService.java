@@ -259,6 +259,9 @@ public class MentorshipService {
                 mentee.getLastName(),
                 mentee.getMiddleName(),
                 mentee.getBirthDate(),
+                mentee.getRegion() != null
+                        ? mentee.getRegion().getName()
+                        : null,
                 mentee.getMsu() != null
                         ? mentee.getMsu().getName()
                         : null,
