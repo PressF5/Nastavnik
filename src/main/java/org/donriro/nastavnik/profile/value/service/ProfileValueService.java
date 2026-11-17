@@ -123,9 +123,32 @@ public class ProfileValueService {
                 .toList();
     }
 
+
     public List<ProfileValueResponse> getAllForUser(Long userId) {
+        User profileOwner = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Пользователь не найден."));
+
+        if (profileOwner.getRole() == null) {
+            return List.of();
+        }
+
+        // Получаем только активные поля, назначенные роли владельца анкеты.
+        List<ProfileFieldRole> assignments = profileFieldRoleRepository
+                .findAllByRole_CodeAndProfileField_ActiveTrueOrderBySortOrderAscProfileField_IdAsc(profileOwner.getRole().getCode());
+
+        Map<Long, ProfileFieldRole> assignmentsByFieldId = assignments.stream()
+                .collect(Collectors.toMap(
+                        assignment -> assignment.getProfileField().getId(),
+                        Function.identity()));
+
         return profileValueRepository.findAllByUser_Id(userId)
                 .stream()
+                // Не показываем неактивные и не назначенные роли поля.
+                .filter(value -> assignmentsByFieldId.containsKey(
+                        value.getProfileField().getId()))
+                // Соблюдаем порядок полей, установленный администратором.
+                .sorted(Comparator.comparingInt(value ->
+                        assignmentsByFieldId.get(value.getProfileField().getId()).getSortOrder()))
                 .map(value -> {
                     List<ProfileFieldOption> selectedOptions =
                             profileValueOptionRepository
@@ -138,7 +161,6 @@ public class ProfileValueService {
                 })
                 .toList();
     }
-
 
     private ProfileValueResponse saveValue(User user, SaveProfileValueRequest request, ProfileFieldRole assignment) {
         ProfileField field = assignment.getProfileField();
