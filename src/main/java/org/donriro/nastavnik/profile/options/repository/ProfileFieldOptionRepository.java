@@ -16,4 +16,5 @@ public interface ProfileFieldOptionRepository extends JpaRepository<ProfileField
     boolean existsByProfileField_Id(Long profileFieldId);
     List<ProfileFieldOption> findAllByProfileField_IdOrderBySortOrderAscIdAsc(Long profileFieldId);
     List<ProfileFieldOption> findAllByProfileField_IdAndActiveTrueOrderBySortOrderAscIdAsc(Long profileFieldId);
+    long countByProfileField_IdAndActiveTrue(Long profileFieldId);
 }

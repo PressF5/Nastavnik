@@ -70,7 +70,14 @@ public class ProfileFieldOptionService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Вариант с таким value уже существует.");
         }
 
-        option.setValue(value);
+        // value является стабильным идентификатором варианта.
+        // Изменение value может изменить смысл уже сохранённых ответов.
+        if (!option.getValue().equals(value)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, "Нельзя изменить value существующего варианта. Создайте новый вариант и деактивируйте старый.");
+        }
+
+        // Название и порядок отображения можно редактировать.
         option.setLabel(request.label().trim());
         option.setSortOrder(request.sortOrder());
 
@@ -80,6 +87,12 @@ public class ProfileFieldOptionService {
     @Transactional
     public void deactivate(Long fieldId, Long optionId) {
         ProfileFieldOption option = getOption(fieldId, optionId);
+        long activeOptionsCount = optionRepository.countByProfileField_IdAndActiveTrue(fieldId);
+
+        if (option.isActive() && activeOptionsCount <= 1) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Нельзя деактивировать последний активный вариант поля.");
+        }
+
         option.setActive(false);
     }
 
