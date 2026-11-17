@@ -11,5 +11,5 @@ import java.util.Optional;
 public interface ProfileValueRepository extends JpaRepository<ProfileValue, Long> {
     Optional<ProfileValue> findByUser_IdAndProfileField_Id(Long userId, Long profileFieldId);
     List<ProfileValue> findAllByUser_Id(Long userId);
-    boolean existsByUser_IdAndProfileField_Id(Long userId, Long profileFieldId);
+    boolean existsByProfileField_Id(Long profileFieldId);
 }

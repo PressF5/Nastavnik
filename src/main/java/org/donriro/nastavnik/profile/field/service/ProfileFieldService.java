@@ -3,6 +3,7 @@ package org.donriro.nastavnik.profile.field.service;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import lombok.RequiredArgsConstructor;
+import org.donriro.nastavnik.matching.repository.ProfileMatchingRuleRepository;
 import org.donriro.nastavnik.profile.field.dto.CreateProfileFieldRequest;
 import org.donriro.nastavnik.profile.field.dto.ProfileFieldResponse;
 import org.donriro.nastavnik.profile.field.dto.ProfileFieldRoleRequest;
@@ -18,6 +19,7 @@ import org.donriro.nastavnik.profile.options.dto.ProfileFieldOptionRequest;
 import org.donriro.nastavnik.profile.options.dto.ProfileFieldOptionResponse;
 import org.donriro.nastavnik.profile.options.exception.ProfileFieldOptionsRequiredException;
 import org.donriro.nastavnik.profile.options.service.ProfileFieldOptionService;
+import org.donriro.nastavnik.profile.value.repository.ProfileValueRepository;
 import org.donriro.nastavnik.user.entity.Role;
 import org.donriro.nastavnik.user.repository.RoleRepository;
 import org.donriro.nastavnik.user.role.RoleCode;
@@ -45,6 +47,8 @@ public class ProfileFieldService {
     private final ProfileFieldRoleRepository profileFieldRoleRepository;
     private final RoleRepository roleRepository;
     private final ProfileFieldOptionService profileFieldOptionService;
+    private final ProfileValueRepository profileValueRepository;
+    private final ProfileMatchingRuleRepository profileMatchingRuleRepository;
 
     private final EntityManager entityManager;
 
@@ -106,10 +110,21 @@ public class ProfileFieldService {
         ProfileFieldType requestedType = request.fieldType();
 
         if (currentType != requestedType) {
-            boolean hasOptions =
-                    profileFieldOptionService.hasOptions(field.getId());
 
-            if (isChoiceField(currentType) && !isChoiceField(requestedType) && hasOptions) {
+            // Нельзя менять тип поля, если пользователи уже сохранили значения.
+            if (profileValueRepository.existsByProfileField_Id(fieldId)) {
+                throw new ProfileFieldTypeChangeNotAllowedException("Нельзя изменить тип поля, поскольку пользователи уже заполнили его.");
+            }
+
+            // Нельзя менять тип поля, если для него настроено правило подбора.
+            if (profileMatchingRuleRepository.existsByProfileField_Id(fieldId)) {
+                throw new ProfileFieldTypeChangeNotAllowedException("Нельзя изменить тип поля, поскольку для него настроено правило подбора.");
+            }
+
+            // Не допускаем удаления вариантов выбора, даже если поле пока не заполнено.
+            if (isChoiceField(currentType)
+                    && !isChoiceField(requestedType)
+                    && profileFieldOptionService.hasOptions(fieldId)) {
                 throw new ProfileFieldTypeChangeNotAllowedException("Нельзя изменить тип поля, пока у него существуют варианты.");
             }
         }
