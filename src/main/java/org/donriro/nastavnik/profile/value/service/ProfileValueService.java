@@ -139,16 +139,33 @@ public class ProfileValueService {
                 .toList();
     }
 
+
     private ProfileValueResponse saveValue(User user, SaveProfileValueRequest request, ProfileFieldRole assignment) {
         ProfileField field = assignment.getProfileField();
 
         validateValue(request, field.getFieldType(), assignment.isRequired());
 
-        List<ProfileFieldOption> selectedOptions = resolveOptions(request.optionIds(), field);
-
+        // Загружаем ранее сохранённое значение.
         ProfileValue value = profileValueRepository
                 .findByUser_IdAndProfileField_Id(user.getId(), field.getId())
-                .orElseGet(ProfileValue::new);
+                .orElse(null);
+
+        // Запоминаем варианты, которые пользователь уже выбирал ранее.
+        // Они могут быть деактивированы администратором.
+        Set<Long> previouslySelectedOptionIds = value == null
+                ? Set.of()
+                : profileValueOptionRepository
+                .findAllByProfileValue_Id(value.getId())
+                .stream()
+                .map(link -> link.getProfileOption().getId())
+                .collect(Collectors.toSet());
+
+        // Разрешаем сохранить активные варианты и ранее выбранные неактивные.
+        List<ProfileFieldOption> selectedOptions = resolveOptions(request.optionIds(), field, previouslySelectedOptionIds);
+
+        if (value == null) {
+            value = new ProfileValue();
+        }
 
         value.setUser(user);
         value.setProfileField(field);
@@ -186,6 +203,7 @@ public class ProfileValueService {
 
         return toResponse(value, selectedOptions);
     }
+
 
     public List<ProfileValueResponse> getAllForCurrentUser() {
         User user = getCurrentUserFromDatabase();
@@ -300,7 +318,8 @@ public class ProfileValueService {
         }
     }
 
-    private List<ProfileFieldOption> resolveOptions(List<Long> optionIds, ProfileField field) {
+
+    private List<ProfileFieldOption> resolveOptions(List<Long> optionIds, ProfileField field, Set<Long> previouslySelectedOptionIds) {
         boolean choiceField = field.getFieldType() == ProfileFieldType.SELECT || field.getFieldType() == ProfileFieldType.MULTISELECT;
 
         if (!choiceField) {
@@ -312,6 +331,7 @@ public class ProfileValueService {
         }
 
         Set<Long> uniqueIds = new HashSet<>(optionIds);
+
         if (uniqueIds.size() != optionIds.size()) {
             throw badRequest("Список выбранных вариантов содержит дубликаты.");
         }
@@ -323,21 +343,22 @@ public class ProfileValueService {
         }
 
         for (ProfileFieldOption option : options) {
-            if (!option.isActive()) {
-                throw badRequest("Нельзя выбрать неактивный вариант.");
-            }
-
             if (!option.getProfileField().getId().equals(field.getId())) {
                 throw badRequest("Выбранный вариант относится к другому полю.");
             }
+
+            // Неактивный вариант разрешён только в том случае,
+            // если пользователь уже выбирал его ранее.
+            if (!option.isActive() && !previouslySelectedOptionIds.contains(option.getId())) {
+                throw badRequest("Нельзя выбрать неактивный вариант.");
+            }
         }
 
-        // Стабильный порядок в ответе: sortOrder, затем id.
-        options.sort(Comparator.comparingInt(ProfileFieldOption::getSortOrder)
-                .thenComparingLong(ProfileFieldOption::getId));
+        options.sort(Comparator.comparingInt(ProfileFieldOption::getSortOrder).thenComparingLong(ProfileFieldOption::getId));
 
         return options;
     }
+
 
     private String normalizeText(String value) {
         if (value == null || value.isBlank()) {

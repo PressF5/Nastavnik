@@ -222,8 +222,10 @@ public class ProfileFieldService {
                         )
                 );
 
-        List<ProfileFieldOptionResponse> options =
-                isChoiceField(field.getFieldType()) ? profileFieldOptionService.getActiveOptions(field.getId()) : List.of();
+        List<ProfileFieldOptionResponse> options = isChoiceField(field.getFieldType())
+                        ? profileFieldOptionService.getAll(field.getId())
+                        : List.of();
+
         return new ProfileFieldResponse(
                 field.getId(),
                 field.getVersion(),
