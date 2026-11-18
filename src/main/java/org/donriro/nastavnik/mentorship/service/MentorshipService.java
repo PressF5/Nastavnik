@@ -59,13 +59,17 @@ public class MentorshipService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "У администратора не настроена организационная принадлежность.");
         }
 
-        // Блокируем запись наставляемого до завершения транзакции.
-        // Параллельные запросы на создание заявок для этого пользователя
-        // будут выполняться последовательно.
+        // Сначала блокируем наставника.
+        // Создание и принятие заявок одного наставника должны выполняться последовательно.
+        User mentor = userRepository
+                .findByIdForUpdate(request.mentorId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Наставник не найден."));
+
+        // Затем блокируем наставляемого.
+        // Это предотвращает одновременное создание нескольких активных назначений.
         User mentee = userRepository
                 .findByIdForUpdate(request.menteeId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Наставляемый не найден."));
-        User mentor = getUser(request.mentorId());
 
         requireRole(mentee, RoleCode.MENTEE);
         requireRole(mentor, RoleCode.MENTOR);
@@ -82,6 +86,12 @@ public class MentorshipService {
 
         requireActiveAccount(mentee);
         requireActiveAccount(mentor);
+
+        // Не создаём новые заявки наставнику, который уже достиг лимита.
+        long activeMentees = mentorshipRepository.countByMentor_IdAndStatus(mentor.getId(), MentorshipStatus.ACCEPTED);
+        if (activeMentees >= 3) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Наставник уже имеет трёх действующих наставляемых.");
+        }
 
         // Предварительно проверяем совместимость наставника
         // и наставляемого. Допускается только результат строго выше 50%.
@@ -262,7 +272,50 @@ public class MentorshipService {
         }
 
         Mentorship saved = mentorshipRepository.save(mentorship);
-        writeAudit(saved, mentor, request.decision() == MentorshipDecision.ACCEPT ? "REQUEST_ACCEPTED" : "REQUEST_REJECTED", oldStatus, saved.getStatus(), request.comment());
+
+        writeAudit(
+                saved,
+                mentor,
+                request.decision() == MentorshipDecision.ACCEPT
+                        ? "REQUEST_ACCEPTED"
+                        : "REQUEST_REJECTED",
+                oldStatus,
+                saved.getStatus(),
+                request.comment()
+        );
+
+        // После принятия третьего наставляемого автоматически отклоняем остальные заявки.
+        if (request.decision() == MentorshipDecision.ACCEPT) {
+            long activeMentees = mentorshipRepository.countByMentor_IdAndStatus(mentor.getId(), MentorshipStatus.ACCEPTED);
+
+            if (activeMentees >= 3) {
+                List<Mentorship> pendingRequests = mentorshipRepository
+                        .findAllByMentor_IdAndStatusOrderByCreatedAtDesc(mentor.getId(), MentorshipStatus.PENDING);
+                String rejectionReason = "Наставник достиг максимального количества действующих наставляемых";
+
+                for (Mentorship pendingRequest : pendingRequests) {
+                    MentorshipStatus previousStatus = pendingRequest.getStatus();
+
+                    pendingRequest.setStatus(MentorshipStatus.REJECTED);
+                    pendingRequest.setStartedAt(null);
+                    pendingRequest.setEndedAt(null);
+
+                    mentorshipRepository.save(pendingRequest);
+
+                    // Автоматическое отклонение фиксируется от имени системы.
+                    writeAudit(
+                            pendingRequest,
+                            null,
+                            "AUTO_REJECTED_LIMIT_REACHED",
+                            previousStatus,
+                            MentorshipStatus.REJECTED,
+                            rejectionReason,
+                            AuditSource.SYSTEM
+                    );
+                }
+            }
+        }
+
         return toResponse(saved);
     }
 
@@ -494,6 +547,10 @@ public class MentorshipService {
     }
 
     private void writeAudit(Mentorship mentorship, User actor, String action, MentorshipStatus oldStatus, MentorshipStatus newStatus, String comment) {
+        writeAudit(mentorship, actor, action, oldStatus, newStatus, comment, AuditSource.USER);
+    }
+
+    private void writeAudit(Mentorship mentorship, User actor, String action, MentorshipStatus oldStatus, MentorshipStatus newStatus, String comment, AuditSource source) {
         MentorshipAuditLog auditLog = new MentorshipAuditLog();
 
         auditLog.setMentorship(mentorship);
@@ -503,7 +560,7 @@ public class MentorshipService {
         auditLog.setOldStatus(oldStatus);
         auditLog.setNewStatus(newStatus);
         auditLog.setComment(comment);
-        auditLog.setSource(AuditSource.USER);
+        auditLog.setSource(source);
 
         auditLogRepository.save(auditLog);
     }
