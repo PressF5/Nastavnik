@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.donriro.nastavnik.matching.dto.MentorMatchingResponse;
 import org.donriro.nastavnik.mentorship.repository.MentorshipRepository;
 import org.donriro.nastavnik.mentorship.status.MentorshipStatus;
+import org.donriro.nastavnik.profile.value.repository.ProfileValueRepository;
 import org.donriro.nastavnik.security.principal.CustomUserDetails;
 import org.donriro.nastavnik.user.entity.User;
 import org.donriro.nastavnik.user.repository.UserRepository;
@@ -19,16 +20,21 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class MentorMatchingService {
 
+    private static final String MENTOR_READINESS_FIELD_NAME = "Готовность к наставничеству";
+
     private final UserRepository userRepository;
     private final ProfileCompatibilityCalculator compatibilityCalculator;
     private final MentorshipRepository mentorshipRepository;
+    private final ProfileValueRepository profileValueRepository;
 
     public List<MentorMatchingResponse> findMentorsFor(User mentee) {
         if (mentee == null || mentee.getId() == null) {
@@ -56,7 +62,20 @@ public class MentorMatchingService {
         Long msuId = mentee.getMsu().getId();
         List<User> mentors = userRepository.findEligibleMentors(RoleCode.MENTOR, msuId, AccountStatus.ACCEPTED, MentorshipStatus.ACCEPTED);
 
+        // Получаем ID наставников, подтвердивших готовность к наставничеству.
+        Set<Long> mentorIds = mentors.stream()
+                .map(User::getId)
+                .collect(java.util.stream.Collectors.toSet());
+
+        if (mentorIds.isEmpty()) {
+            return List.of();
+        }
+
+        Set<Long> readyMentorIds = new HashSet<>(
+                profileValueRepository.findUserIdsWithTrueBooleanValue(mentorIds, MENTOR_READINESS_FIELD_NAME));
+
         return mentors.stream()
+                .filter(mentor -> readyMentorIds.contains(mentor.getId()))
                 .map(mentor -> {
                     var compatibility = compatibilityCalculator.calculate(mentor.getId(), mentee.getId());
                     return new MentorMatchingResponse(
@@ -64,11 +83,14 @@ public class MentorMatchingService {
                             mentor.getFirstName(),
                             mentor.getLastName(),
                             mentor.getMiddleName(),
-                            mentor.getEducationalOrganization() != null ? mentor.getEducationalOrganization().getName() : null,
+                            mentor.getEducationalOrganization() != null
+                                    ? mentor.getEducationalOrganization().getName()
+                                    : null,
                             compatibility.compatibilityPercentage(),
                             compatibility.comparableFieldCount()
                     );
                 })
+                .filter(mentor -> readyMentorIds.contains(mentor.mentorId()))
                 .filter(result -> result.compatibilityPercentage() != null)
                 .filter(result -> result.compatibilityPercentage().compareTo(BigDecimal.valueOf(50)) > 0)
                 .sorted(Comparator.comparing(MentorMatchingResponse::compatibilityPercentage).reversed())
