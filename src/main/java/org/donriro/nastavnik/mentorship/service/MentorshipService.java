@@ -355,6 +355,7 @@ public class MentorshipService {
                 .findByIdForUpdate(currentMentor.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Наставник не найден."));
 
+        requireRole(mentor, RoleCode.MENTOR);
         requireActiveAccount(mentor);
 
         Mentorship mentorship = mentorshipRepository
