@@ -90,7 +90,6 @@ public class MentorMatchingService {
                             compatibility.comparableFieldCount()
                     );
                 })
-                .filter(mentor -> readyMentorIds.contains(mentor.mentorId()))
                 .filter(result -> result.compatibilityPercentage() != null)
                 .filter(result -> result.compatibilityPercentage().compareTo(BigDecimal.valueOf(50)) > 0)
                 .sorted(Comparator.comparing(MentorMatchingResponse::compatibilityPercentage).reversed())
