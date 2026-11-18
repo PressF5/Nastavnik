@@ -3,6 +3,7 @@ package org.donriro.nastavnik.user.controller;
 import lombok.RequiredArgsConstructor;
 import org.donriro.nastavnik.security.principal.CustomUserDetails;
 import org.donriro.nastavnik.user.dto.response.RegistrationResponse;
+import org.donriro.nastavnik.user.dto.response.UserProfileResponse;
 import org.donriro.nastavnik.user.entity.User;
 import org.donriro.nastavnik.user.role.RoleCode;
 import org.donriro.nastavnik.user.service.UserApprovalService;
@@ -78,5 +79,10 @@ public class UserApprovalController {
     public ResponseEntity<RegistrationResponse> unblock(@AuthenticationPrincipal CustomUserDetails principal, @PathVariable Long id) {
         User user = userApprovalService.unblockUser(principal.getUser().getId(), id);
         return ResponseEntity.ok(RegistrationResponse.from(user));
+    }
+
+    @GetMapping("/{id}/profile")
+    public ResponseEntity<UserProfileResponse> getUserProfile(@AuthenticationPrincipal CustomUserDetails principal, @PathVariable Long id) {
+        return ResponseEntity.ok(userApprovalService.getUserProfile(principal.getUser().getId(), id));
     }
 }

@@ -2,6 +2,9 @@ package org.donriro.nastavnik.user.service;
 
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
+import org.donriro.nastavnik.profile.value.dto.ProfileValueResponse;
+import org.donriro.nastavnik.profile.value.service.ProfileValueService;
+import org.donriro.nastavnik.user.dto.response.UserProfileResponse;
 import org.donriro.nastavnik.user.entity.User;
 import org.donriro.nastavnik.user.entity.UserAuditLog;
 import org.donriro.nastavnik.user.repository.UserAuditLogRepository;
@@ -28,6 +31,7 @@ public class UserApprovalService {
 
     private final UserRepository userRepository;
     private final UserAuditLogRepository userAuditLogRepository;
+    private final ProfileValueService profileValueService;
 
     public List<User> getPendingUsers(Long actorId) {
         User actor = getUser(actorId);
@@ -163,6 +167,69 @@ public class UserApprovalService {
 
         return userRepository.findAll(specification, pageable);
     }
+
+    /**
+     * Возвращает подробную информацию о пользователе
+     * в пределах организационной области администратора.
+     */
+    public UserProfileResponse getUserProfile(Long actorId, Long targetId) {
+        User actor = userRepository.findByIdWithOrganizationContext(actorId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Администратор не найден."));
+
+        User target = userRepository.findByIdWithOrganizationContext(targetId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Пользователь не найден."));
+
+        if (actor.getAccountStatus() != AccountStatus.ACCEPTED || actor.isBlocked()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "У вас нет прав на просмотр профиля.");
+        }
+
+        if (!hasProfileViewScope(actor, target)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "У вас нет доступа к профилю этого пользователя.");
+        }
+
+        List<ProfileValueResponse> profileValues = profileValueService.getAllForUser(target.getId());
+
+        return UserProfileResponse.from(target, profileValues);
+    }
+
+    /**
+     * Проверяет доступ к просмотру профиля.
+     * Правила просмотра не зависят от прав подтверждения или блокировки.
+     */
+    private boolean hasProfileViewScope(User actor, User target) {
+        if (actor.getId().equals(target.getId())) {
+            return false;
+        }
+
+        if (actor.getRole() == null || target.getRole() == null) {
+            return false;
+        }
+
+        Long targetMsuId = target.getEducationalOrganization() != null
+                && target.getEducationalOrganization().getMsu() != null
+                ? target.getEducationalOrganization().getMsu().getId()
+                : target.getMsu() != null
+                ? target.getMsu().getId()
+                : null;
+
+        return switch (actor.getRole().getCode()) {
+            case REGION_ADMIN ->
+                    actor.getRegion() != null
+                            && target.getRegion() != null
+                            && actor.getRegion().getId().equals(
+                            target.getRegion().getId());
+            case MSU_ADMIN ->
+                    actor.getMsu() != null
+                            && actor.getMsu().getId().equals(targetMsuId);
+            case OO_ADMIN ->
+                    actor.getEducationalOrganization() != null
+                            && target.getEducationalOrganization() != null
+                            && actor.getEducationalOrganization().getId().equals(
+                            target.getEducationalOrganization().getId());
+            default -> false;
+        };
+    }
+
 
     private String escapeLikePattern(String value) {
         return value
