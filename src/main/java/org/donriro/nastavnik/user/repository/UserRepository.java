@@ -12,6 +12,7 @@ import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -76,34 +77,40 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
      * Возвращает наставляемых, которым можно назначить наставника.
      * Исключаются пользователи:
      * - с ожидающей заявкой PENDING;
-     * - с действующим наставничеством ACCEPTED.
+     * - с действующим наставничеством ACCEPTED;
+     * - не соответствующие возрастному ограничению.
      * Учитываются только подтверждённые и незаблокированные
      * аккаунты из указанной образовательной организации.
      */
     @Query("""
-    select u
-    from User u
-    join fetch u.role
-    left join fetch u.msu
-    left join fetch u.educationalOrganization
-    where u.role.code = :roleCode
-      and u.educationalOrganization.id = :organizationId
-      and u.accountStatus = :accountStatus
-      and u.blocked = false
-      and not exists (
-          select m.id
-          from Mentorship m
-          where m.mentee.id = u.id
-            and m.status in :excludedStatuses
-      )
-    order by u.lastName, u.firstName, u.middleName
-    """)
+            select u
+            from User u
+            join fetch u.role
+            left join fetch u.msu
+            left join fetch u.educationalOrganization
+            where u.role.code = :roleCode
+              and u.educationalOrganization.id = :organizationId
+              and u.accountStatus = :accountStatus
+              and u.blocked = false
+              and u.birthDate <= :today
+              and u.birthDate > :oldestAllowedBirthDateExclusive
+              and not exists (
+                  select m.id
+                  from Mentorship m
+                  where m.mentee.id = u.id
+                    and m.status in :excludedStatuses
+              )
+            order by u.lastName, u.firstName, u.middleName
+            """)
     List<User> findAvailableMentees(
             @Param("roleCode") RoleCode roleCode,
             @Param("organizationId") Long organizationId,
             @Param("accountStatus") AccountStatus accountStatus,
-            @Param("excludedStatuses") List<MentorshipStatus> excludedStatuses
+            @Param("excludedStatuses") List<MentorshipStatus> excludedStatuses,
+            @Param("today") LocalDate today,
+            @Param("oldestAllowedBirthDateExclusive") LocalDate oldestAllowedBirthDateExclusive
     );
+
     @EntityGraph(attributePaths = {"role", "region", "msu", "educationalOrganization", "educationalOrganization.msu"})
     @Override
     Page<User> findAll(Specification<User> spec, Pageable pageable);

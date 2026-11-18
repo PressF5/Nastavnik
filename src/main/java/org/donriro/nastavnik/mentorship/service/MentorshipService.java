@@ -29,6 +29,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -43,6 +44,7 @@ public class MentorshipService {
     private final UserRepository userRepository;
     private final ProfileCompatibilityCalculator compatibilityCalculator;
     private final ProfileValueService profileValueService;
+    private static final int MAX_MENTEE_AGE = 35;
 
     /**
      * Администратор ОО создаёт предварительную заявку
@@ -86,6 +88,7 @@ public class MentorshipService {
 
         requireActiveAccount(mentee);
         requireActiveAccount(mentor);
+        requireAllowedMenteeAge(mentee);
 
         // Не создаём новые заявки наставнику, который уже достиг лимита.
         long activeMentees = mentorshipRepository.countByMentor_IdAndStatus(mentor.getId(), MentorshipStatus.ACCEPTED);
@@ -228,6 +231,7 @@ public class MentorshipService {
 
             requireRole(mentee, RoleCode.MENTEE);
             requireActiveAccount(mentee);
+            requireAllowedMenteeAge(mentee);
 
             if (!sameMsu(mentor, mentee)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Наставник и наставляемый должны относиться к одному МСУ.");
@@ -452,11 +456,16 @@ public class MentorshipService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "У администратора не настроена организационная принадлежность.");
         }
 
+        LocalDate today = LocalDate.now();
+        LocalDate oldestAllowedBirthDateExclusive = today.minusYears(MAX_MENTEE_AGE + 1L);
+
         return userRepository.findAvailableMentees(
                         RoleCode.MENTEE,
                         admin.getEducationalOrganization().getId(),
                         AccountStatus.ACCEPTED,
-                        List.of(MentorshipStatus.PENDING, MentorshipStatus.ACCEPTED))
+                        List.of(MentorshipStatus.PENDING, MentorshipStatus.ACCEPTED),
+                        today,
+                        oldestAllowedBirthDateExclusive)
                 .stream()
                 .map(mentee -> new AvailableMenteeResponse(
                         mentee.getId(),
@@ -544,6 +553,19 @@ public class MentorshipService {
                             log.getCreatedAt());
                 })
                 .toList();
+    }
+
+    /**
+     * Проверяет, соответствует ли наставляемый возрастному ограничению.
+     */
+    private void requireAllowedMenteeAge(User mentee) {
+        LocalDate today = LocalDate.now();
+
+        if (mentee.getBirthDate() == null
+                || mentee.getBirthDate().isAfter(today)
+                || !mentee.getBirthDate().isAfter(today.minusYears(MAX_MENTEE_AGE + 1L))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Наставляемый должен быть не старше 35 лет.");
+        }
     }
 
     private void writeAudit(Mentorship mentorship, User actor, String action, MentorshipStatus oldStatus, MentorshipStatus newStatus, String comment) {
