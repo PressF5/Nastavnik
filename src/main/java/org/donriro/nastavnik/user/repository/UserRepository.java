@@ -24,10 +24,6 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     boolean existsByEducationalOrganizationId(Long educationalOrganizationId);
     boolean existsByRoleCodeAndMsuIdAndAccountStatusIn(RoleCode roleCode, Long id, List<AccountStatus> activeAdminStatuses);
     boolean existsByRoleCodeAndEducationalOrganizationIdAndAccountStatusIn(RoleCode roleCode, Long educationalOrganizationId, List<AccountStatus> statuses);
-    Optional<User> findByEmail(String email);
-    List<User> findAllByRoleCode(RoleCode roleCode);
-    List<User> findAllByMsuId(Long msuId);
-    List<User> findAllByEducationalOrganizationId(Long educationalOrganizationId);
     List<User> findAllByAccountStatus(AccountStatus status);
 
     @Query("""
@@ -43,30 +39,32 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     /**
      * Возвращает подтверждённых и незаблокированных наставников
-     * указанного МСУ.
+     * указанного МСУ, у которых есть свободные места.
      *
-     * Количество действующих наставляемых не ограничивает подбор
-     * наставника: администратор ОО может отправить ему новую заявку.
-     * Ограничение в три наставляемых проверяется при принятии заявки.
+     * Наставники с тремя действующими наставляемыми исключаются.
+     * Ожидающие заявки в лимит не входят.
      */
     @Query("""
-        select u
-        from User u
-        join fetch u.role
-        join fetch u.region
-        left join fetch u.msu
-        left join fetch u.educationalOrganization
-        where u.role.code = :roleCode
-          and u.msu.id = :msuId
-          and u.accountStatus = :status
-          and u.blocked = false
-        order by u.lastName, u.firstName, u.middleName
-        """)
-    List<User> findEligibleMentors(
-            @Param("roleCode") RoleCode roleCode,
-            @Param("msuId") Long msuId,
-            @Param("status") AccountStatus status
-    );
+    select u
+    from User u
+    join fetch u.role
+    join fetch u.region
+    left join fetch u.msu
+    left join fetch u.educationalOrganization
+    where u.role.code = :roleCode
+      and u.msu.id = :msuId
+      and u.accountStatus = :status
+      and u.blocked = false
+      and (
+          select count(m.id)
+          from Mentorship m
+          where m.mentor.id = u.id
+            and m.status = :mentorshipStatus
+      ) < 3
+    order by u.lastName, u.firstName, u.middleName
+    """)
+    List<User> findEligibleMentors(@Param("roleCode") RoleCode roleCode, @Param("msuId") Long msuId, @Param("status") AccountStatus status, @Param("mentorshipStatus") MentorshipStatus mentorshipStatus);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select u

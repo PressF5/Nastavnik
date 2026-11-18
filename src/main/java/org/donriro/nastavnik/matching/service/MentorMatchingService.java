@@ -47,7 +47,7 @@ public class MentorMatchingService {
         }
 
         Long msuId = mentee.getMsu().getId();
-        List<User> mentors = userRepository.findEligibleMentors(RoleCode.MENTOR, msuId, AccountStatus.ACCEPTED);
+        List<User> mentors = userRepository.findEligibleMentors(RoleCode.MENTOR, msuId, AccountStatus.ACCEPTED, MentorshipStatus.ACCEPTED);
 
         return mentors.stream()
                 .map(mentor -> {
