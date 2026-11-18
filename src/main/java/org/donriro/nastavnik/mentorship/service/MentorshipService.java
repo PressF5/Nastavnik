@@ -207,7 +207,6 @@ public class MentorshipService {
 
         MentorshipStatus oldStatus = mentorship.getStatus();
 
-
         if (request.decision() == MentorshipDecision.ACCEPT) {
 
             // Блокируем наставляемого до завершения транзакции.
@@ -216,6 +215,21 @@ public class MentorshipService {
             User mentee = userRepository
                     .findByIdForUpdate(mentorship.getMentee().getId())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Наставляемый не найден."));
+
+            requireRole(mentee, RoleCode.MENTEE);
+            requireActiveAccount(mentee);
+
+            if (!sameMsu(mentor, mentee)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Наставник и наставляемый должны относиться к одному МСУ.");
+            }
+
+            var compatibility = compatibilityCalculator.calculate(mentor.getId(), mentee.getId());
+            BigDecimal compatibilityPercentage = compatibility.compatibilityPercentage();
+
+            if (compatibilityPercentage == null || compatibilityPercentage.compareTo(BigDecimal.valueOf(50)) <= 0) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Совместимость наставника и наставляемого должна быть выше 50%. Предложение больше нельзя принять.");
+            }
 
             // После получения блокировки проверяем актуальное состояние.
             // У наставляемого может быть только один действующий наставник.
