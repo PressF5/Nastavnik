@@ -323,6 +323,56 @@ public class MentorshipService {
         return toResponse(saved);
     }
 
+
+    /**
+     * Возвращает анкету наставляемого из ожидающей заявки.
+     * Наставник может просматривать только заявки, адресованные ему.
+     */
+    public MenteeProfileResponse getPendingMenteeProfile(Long mentorshipId) {
+        User mentor = getCurrentUser();
+
+        requireRole(mentor, RoleCode.MENTOR);
+        requireActiveAccount(mentor);
+
+        Mentorship mentorship = mentorshipRepository
+                .findById(mentorshipId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Заявка на наставничество не найдена."
+                ));
+
+        // Запрещаем просматривать заявки других наставников.
+        if (!mentorship.getMentor().getId().equals(mentor.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Эта заявка адресована другому наставнику.");
+        }
+
+        // Просмотр доступен только для ожидающей заявки.
+        if (mentorship.getStatus() != MentorshipStatus.PENDING) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Заявка больше не ожидает решения.");
+        }
+
+        User mentee = mentorship.getMentee();
+
+        return new MenteeProfileResponse(
+                mentee.getId(),
+                mentee.getFirstName(),
+                mentee.getLastName(),
+                mentee.getMiddleName(),
+                mentee.getBirthDate(),
+                mentee.getRegion() != null
+                        ? mentee.getRegion().getName()
+                        : null,
+                mentee.getMsu() != null
+                        ? mentee.getMsu().getName()
+                        : null,
+                mentee.getEducationalOrganization() != null
+                        ? mentee.getEducationalOrganization().getName()
+                        : null,
+                toResponse(mentorship),
+                profileValueService.getAllForUser(mentee.getId())
+        );
+    }
+
     /**
      * Возвращает карточку наставляемого,
      * с которым у текущего наставника есть действующее назначение.

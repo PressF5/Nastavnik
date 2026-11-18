@@ -116,4 +116,13 @@ public class MentorshipController {
     public ResponseEntity<List<MentorshipAuditLogResponse>> getOrganizationMentorshipHistory(@PathVariable Long id) {
         return ResponseEntity.ok(mentorshipService.getOrganizationMentorshipHistory(id));
     }
+
+    /**
+     * Возвращает анкету наставляемого из ожидающей заявки.
+     */
+    @GetMapping("/api/mentor/mentorship-assignments/{id}/mentee-profile")
+    @PreAuthorize("hasRole('MENTOR')")
+    public ResponseEntity<MenteeProfileResponse> getPendingMenteeProfile(@PathVariable("id") Long mentorshipId) {
+        return ResponseEntity.ok(mentorshipService.getPendingMenteeProfile(mentorshipId));
+    }
 }
