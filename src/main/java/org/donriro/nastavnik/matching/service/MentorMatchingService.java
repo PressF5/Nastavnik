@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 
@@ -44,6 +45,12 @@ public class MentorMatchingService {
 
         if (mentee.isBlocked() || mentee.getAccountStatus() != AccountStatus.ACCEPTED) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Наставляемый должен иметь подтверждённую и активную учётную запись.");
+        }
+
+        LocalDate today = LocalDate.now();
+
+        if (mentee.getBirthDate() == null || mentee.getBirthDate().isAfter(today) || !mentee.getBirthDate().isAfter(today.minusYears(36))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Наставляемый должен быть не старше 35 лет.");
         }
 
         Long msuId = mentee.getMsu().getId();
