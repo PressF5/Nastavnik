@@ -5,7 +5,9 @@ import org.donriro.nastavnik.matching.dto.MentorMatchingResponse;
 import org.donriro.nastavnik.mentorship.repository.MentorshipRepository;
 import org.donriro.nastavnik.mentorship.status.MentorshipStatus;
 import org.donriro.nastavnik.profile.value.repository.ProfileValueRepository;
+import org.donriro.nastavnik.profile.value.service.ProfileValueService;
 import org.donriro.nastavnik.security.principal.CustomUserDetails;
+import org.donriro.nastavnik.user.dto.response.UserProfileResponse;
 import org.donriro.nastavnik.user.entity.User;
 import org.donriro.nastavnik.user.repository.UserRepository;
 import org.donriro.nastavnik.user.role.RoleCode;
@@ -35,6 +37,7 @@ public class MentorMatchingService {
     private final ProfileCompatibilityCalculator compatibilityCalculator;
     private final MentorshipRepository mentorshipRepository;
     private final ProfileValueRepository profileValueRepository;
+    private final ProfileValueService profileValueService;
 
     public List<MentorMatchingResponse> findMentorsFor(User mentee) {
         if (mentee == null || mentee.getId() == null) {
@@ -124,6 +127,28 @@ public class MentorMatchingService {
         }
 
         return findMentorsFor(mentee);
+    }
+
+    /**
+     * Возвращает профиль наставника, рекомендованного для конкретного наставляемого.
+     * Администратор ОО может просматривать профили рекомендованных наставников
+     * только в пределах своего МСУ.
+     */
+    public UserProfileResponse getMentorProfileForMentee(Long menteeId, Long mentorId) {
+        // Проверяем, что наставник действительно входит в список рекомендаций
+        // для наставляемого, доступного текущему администратору.
+        boolean isCandidate = findMentorsForMentee(menteeId)
+                .stream()
+                .anyMatch(candidate -> candidate.mentorId().equals(mentorId));
+
+        if (!isCandidate) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Нет доступа к профилю этого наставника.");
+        }
+
+        User mentor = userRepository.findByIdWithOrganizationContext(mentorId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Наставник не найден."));
+
+        return UserProfileResponse.from(mentor, profileValueService.getAllForUser(mentorId));
     }
 
     private User getCurrentUser() {

@@ -3,6 +3,7 @@ package org.donriro.nastavnik.matching.controller;
 import lombok.RequiredArgsConstructor;
 import org.donriro.nastavnik.matching.dto.MentorMatchingResponse;
 import org.donriro.nastavnik.matching.service.MentorMatchingService;
+import org.donriro.nastavnik.user.dto.response.UserProfileResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,5 +24,10 @@ public class MentorMatchingController {
     @GetMapping("/{menteeId}/mentors")
     public ResponseEntity<List<MentorMatchingResponse>> findMentors(@PathVariable Long menteeId) {
         return ResponseEntity.ok(mentorMatchingService.findMentorsForMentee(menteeId));
+    }
+
+    @GetMapping("/{menteeId}/mentors/{mentorId}/profile")
+    public ResponseEntity<UserProfileResponse> getMentorProfile(@PathVariable Long menteeId, @PathVariable Long mentorId) {
+        return ResponseEntity.ok(mentorMatchingService.getMentorProfileForMentee(menteeId, mentorId));
     }
 }
