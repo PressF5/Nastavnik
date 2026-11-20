@@ -90,10 +90,11 @@ public class MentorshipController {
                 mentorshipService.getOrganizationMentorships(academicYearId, status, search, pageable));
     }
 
+
     @GetMapping("/api/mentee/mentorship")
     @PreAuthorize("hasRole('MENTEE')")
-    public ResponseEntity<MentorshipResponse> getCurrentMenteeMentorship() {
-        return mentorshipService.getCurrentMenteeMentorship()
+    public ResponseEntity<MentorshipResponse> getCurrentMenteeMentorship(@RequestParam(required = false) Long academicYearId) {
+        return mentorshipService.getCurrentMenteeMentorship(academicYearId)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.<MentorshipResponse>noContent().build());
     }

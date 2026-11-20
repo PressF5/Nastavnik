@@ -192,20 +192,25 @@ public class MentorshipService {
                 .toList();
     }
 
+
     /**
-     * Возвращает текущее назначение наставничества
-     * для авторизованного наставляемого.
+     * Возвращает назначение наставничества
+     * авторизованного наставляемого за выбранный учебный год.
      */
-    public Optional<MentorshipResponse> getCurrentMenteeMentorship() {
+    public Optional<MentorshipResponse> getCurrentMenteeMentorship(Long academicYearId) {
         User mentee = getCurrentUser();
 
         requireRole(mentee, RoleCode.MENTEE);
         requireActiveAccount(mentee);
 
+        AcademicYear academicYear = resolveAcademicYear(academicYearId);
+
         return mentorshipRepository
-                .findFirstByMentee_IdAndStatusInOrderByCreatedAtDesc(
+                .findFirstByMentee_IdAndAcademicYear_IdAndStatusInOrderByCreatedAtDesc(
                         mentee.getId(),
-                        List.of(MentorshipStatus.PENDING, MentorshipStatus.ACCEPTED))
+                        academicYear.getId(),
+                        List.of(MentorshipStatus.PENDING, MentorshipStatus.ACCEPTED)
+                )
                 .map(this::toResponse);
     }
 
