@@ -5,10 +5,13 @@ import org.donriro.nastavnik.mentorship.dto.AcademicYearResponse;
 import org.donriro.nastavnik.mentorship.dto.CreateAcademicYearRequest;
 import org.donriro.nastavnik.mentorship.dto.UpdateAcademicYearRequest;
 import org.donriro.nastavnik.mentorship.entity.AcademicYear;
+import org.donriro.nastavnik.mentorship.entity.MentorParticipation;
 import org.donriro.nastavnik.mentorship.repository.AcademicYearRepository;
+import org.donriro.nastavnik.mentorship.repository.MentorParticipationRepository;
 import org.donriro.nastavnik.mentorship.status.AcademicYearStatus;
 import org.donriro.nastavnik.security.principal.CustomUserDetails;
 import org.donriro.nastavnik.user.entity.User;
+import org.donriro.nastavnik.user.repository.UserRepository;
 import org.donriro.nastavnik.user.role.RoleCode;
 import org.donriro.nastavnik.user.status.AccountStatus;
 import org.springframework.http.HttpStatus;
@@ -27,8 +30,11 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class AcademicYearService {
 
-    private final AcademicYearRepository academicYearRepository;
     private final Clock clock;
+
+    private final AcademicYearRepository academicYearRepository;
+    private final MentorParticipationRepository mentorParticipationRepository;
+    private final UserRepository userRepository;
 
     /**
      * Создаёт учебный год.
@@ -58,6 +64,23 @@ public class AcademicYearService {
         academicYear.setEndDate(request.endDate());
 
         AcademicYear saved = academicYearRepository.save(academicYear);
+
+        // Получаем всех действующих наставников.
+        List<User> mentors = userRepository.findAllByRole_CodeAndAccountStatusAndBlockedFalse(RoleCode.MENTOR, AccountStatus.ACCEPTED);
+
+        // Создаём отдельную запись участия для каждого наставника.
+        List<MentorParticipation> participations = mentors.stream()
+                .map(mentor -> {
+                    MentorParticipation participation = new MentorParticipation();
+                    participation.setMentor(mentor);
+                    participation.setAcademicYear(saved);
+                    participation.setParticipated(false);
+                    return participation;
+                })
+                .toList();
+
+        // Сохраняем записи участия вместе с созданием учебного года.
+        mentorParticipationRepository.saveAll(participations);
 
         return toResponse(saved);
     }
