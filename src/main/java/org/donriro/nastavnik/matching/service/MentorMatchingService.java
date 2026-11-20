@@ -132,8 +132,17 @@ public class MentorMatchingService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Наставляемый должен иметь подтверждённую активную учётную запись.");
         }
 
-        if (mentorshipRepository.existsByMentee_IdAndStatusIn(mentee.getId(), List.of(MentorshipStatus.PENDING, MentorshipStatus.ACCEPTED))) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Для наставляемого уже создана заявка или назначен наставник.");
+        LocalDate today = LocalDate.now(clock);
+
+        AcademicYear academicYear = academicYearRepository
+                .findByDate(today)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "На текущую дату не найден действующий учебный год."));
+
+        if (mentorshipRepository.existsByMentee_IdAndAcademicYear_IdAndStatusIn(
+                mentee.getId(),
+                academicYear.getId(),
+                List.of(MentorshipStatus.PENDING, MentorshipStatus.ACCEPTED))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Для наставляемого уже создана заявка или назначен наставник в текущем учебном году.");
         }
 
         return findMentorsFor(mentee);

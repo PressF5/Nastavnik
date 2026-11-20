@@ -634,7 +634,7 @@ public class MentorshipService {
      * Проверяет, соответствует ли наставляемый возрастному ограничению.
      */
     private void requireAllowedMenteeAge(User mentee) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
 
         if (mentee.getBirthDate() == null
                 || mentee.getBirthDate().isAfter(today)
