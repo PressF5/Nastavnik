@@ -164,6 +164,7 @@ public class GlobalExceptionHandler {
             case "uk_region_code" -> buildError(HttpStatus.CONFLICT, ErrorCode.REGION_ALREADY_EXISTS, "Регион с таким кодом уже существует.");
             case "uk_users_one_msu_admin", "uk_users_one_oo_admin" -> buildError(HttpStatus.CONFLICT, ErrorCode.ADMINISTRATOR_ALREADY_EXISTS, "Для указанной территории уже существует администратор.");
             case "uk_mentorship_one_occupied_mentee" -> buildError(HttpStatus.CONFLICT, ErrorCode.DATA_INTEGRITY_VIOLATION, "У наставляемого уже есть ожидающая заявка или действующий наставник.");
+            case "ex_academic_year_no_overlap" -> buildError(HttpStatus.CONFLICT, ErrorCode.ACADEMIC_YEAR_PERIOD_OVERLAP, "Период учебного года пересекается с другим учебным годом.");
             default -> buildError(HttpStatus.CONFLICT, ErrorCode.DATA_INTEGRITY_VIOLATION, "Операция конфликтует с ограничениями базы данных.");
         };
     }
