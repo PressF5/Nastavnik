@@ -183,10 +183,11 @@ public class MentorshipService {
         AcademicYear academicYear = resolveAcademicYear(academicYearId);
 
         return mentorshipRepository
-                .findAllByMentor_IdAndAcademicYear_IdAndStatusOrderByStartedAtDesc(
+                .findAllByMentor_IdAndAcademicYear_IdAndStatusInOrderByStartedAtDesc(
                         mentor.getId(),
                         academicYear.getId(),
-                        MentorshipStatus.ACCEPTED)
+                        List.of(MentorshipStatus.ACCEPTED, MentorshipStatus.ENDED)
+                )
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -209,7 +210,7 @@ public class MentorshipService {
                 .findFirstByMentee_IdAndAcademicYear_IdAndStatusInOrderByCreatedAtDesc(
                         mentee.getId(),
                         academicYear.getId(),
-                        List.of(MentorshipStatus.PENDING, MentorshipStatus.ACCEPTED)
+                        List.of(MentorshipStatus.PENDING, MentorshipStatus.ACCEPTED, MentorshipStatus.ENDED)
                 )
                 .map(this::toResponse);
     }
@@ -438,13 +439,13 @@ public class MentorshipService {
         AcademicYear academicYear = resolveAcademicYear(academicYearId);
 
         Mentorship mentorship = mentorshipRepository
-                .findFirstByMentor_IdAndMentee_IdAndAcademicYear_IdAndStatusOrderByStartedAtDesc(
+                .findFirstByMentor_IdAndMentee_IdAndAcademicYear_IdAndStatusInOrderByStartedAtDesc(
                         mentor.getId(),
                         menteeId,
                         academicYear.getId(),
-                        MentorshipStatus.ACCEPTED
+                        List.of(MentorshipStatus.ACCEPTED, MentorshipStatus.ENDED)
                 )
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Действующий наставляемый не найден в выбранном учебном году."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Наставляемый не найден в выбранном учебном году."));
 
         User mentee = mentorship.getMentee();
 
@@ -479,12 +480,9 @@ public class MentorshipService {
                 .findFirstByMentee_IdAndAcademicYear_IdAndStatusInOrderByCreatedAtDesc(
                         mentee.getId(),
                         academicYear.getId(),
-                        List.of(MentorshipStatus.PENDING, MentorshipStatus.ACCEPTED)
+                        List.of(MentorshipStatus.PENDING, MentorshipStatus.ACCEPTED, MentorshipStatus.ENDED)
                 )
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Назначение наставника не найдено в выбранном учебном году."
-                ));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Назначение наставника не найдено в выбранном учебном году."));
 
         User mentor = mentorship.getMentor();
 

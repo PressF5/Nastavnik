@@ -131,4 +131,19 @@ public interface MentorshipRepository extends JpaRepository<Mentorship, Long> {
             Long academicYearId,
             MentorshipStatus status
     );
+
+    // Возвращает действующие и завершённые пары наставника за конкретный год.
+    List<Mentorship> findAllByMentor_IdAndAcademicYear_IdAndStatusInOrderByStartedAtDesc(
+            Long mentorId,
+            Long academicYearId,
+            List<MentorshipStatus> statuses
+    );
+
+    // Находит пару наставника и наставляемого с указанными статусами за конкретный год.
+    Optional<Mentorship> findFirstByMentor_IdAndMentee_IdAndAcademicYear_IdAndStatusInOrderByStartedAtDesc(
+            Long mentorId,
+            Long menteeId,
+            Long academicYearId,
+            List<MentorshipStatus> statuses
+    );
 }
