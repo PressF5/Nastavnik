@@ -39,6 +39,16 @@ public class AcademicYearController {
     }
 
     /**
+     * Возвращает текущий и завершённые учебные годы
+     * для выбора в личном кабинете.
+     */
+    @GetMapping("/api/academic-years/available")
+    @PreAuthorize("hasAnyRole('MSU_ADMIN', 'OO_ADMIN', 'MENTOR', 'MENTEE')")
+    public ResponseEntity<List<AcademicYearResponse>> getAvailable() {
+        return ResponseEntity.ok(academicYearService.getAvailableForCurrentUser());
+    }
+
+    /**
      * Возвращает учебный год, действующий на текущую дату.
      */
     @GetMapping("/api/academic-years/current")

@@ -62,4 +62,10 @@ public interface AcademicYearRepository extends JpaRepository<AcademicYear, Long
      * Включает запланированные и активные учебные годы.
      */
     List<AcademicYear> findAllByEndDateGreaterThanEqualOrderByStartDateAsc(LocalDate today);
+
+    /**
+     * Возвращает учебные годы, которые уже начались.
+     * Включает текущие и завершённые годы, исключает запланированные.
+     */
+    List<AcademicYear> findAllByStartDateLessThanEqualOrderByStartDateDesc(LocalDate today);
 }

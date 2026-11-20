@@ -100,6 +100,37 @@ public class AcademicYearService {
     }
 
     /**
+     * Возвращает учебные годы, доступные для просмотра в личном кабинете.
+     * Будущие учебные годы не отображаются.
+     */
+    public List<AcademicYearResponse> getAvailableForCurrentUser() {
+        User currentUser = getCurrentUser();
+
+        if (currentUser.isBlocked()
+                || currentUser.getAccountStatus() != AccountStatus.ACCEPTED) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Учётная запись должна быть подтверждена и не заблокирована.");
+        }
+
+        RoleCode roleCode = currentUser.getRole() != null ? currentUser.getRole().getCode() : null;
+
+        if (roleCode == null
+                || (roleCode != RoleCode.MSU_ADMIN
+                && roleCode != RoleCode.OO_ADMIN
+                && roleCode != RoleCode.MENTOR
+                && roleCode != RoleCode.MENTEE)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "У вас нет доступа к списку учебных годов.");
+        }
+
+        LocalDate today = LocalDate.now(clock);
+
+        return academicYearRepository
+                .findAllByStartDateLessThanEqualOrderByStartDateDesc(today)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    /**
      * Возвращает учебный год по идентификатору.
      */
     public AcademicYearResponse getById(Long id) {
