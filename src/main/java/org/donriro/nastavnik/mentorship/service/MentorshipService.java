@@ -251,20 +251,24 @@ public class MentorshipService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Заявка уже обработана.");
         }
 
-        LocalDate today = LocalDate.now(clock);
+        // Проверяем текущий учебный год и ежегодное участие
+        // только при принятии заявки.
+        if (request.decision() == MentorshipDecision.ACCEPT) {
+            LocalDate today = LocalDate.now(clock);
 
-        AcademicYear currentAcademicYear = academicYearRepository
-                .findByDate(today)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "На текущую дату не найден действующий учебный год."));
+            AcademicYear currentAcademicYear = academicYearRepository
+                    .findByDate(today)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "На текущую дату не найден действующий учебный год."));
 
-        if (request.decision() == MentorshipDecision.ACCEPT
-                && !mentorship.getAcademicYear().getId().equals(currentAcademicYear.getId())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Нельзя принять заявку, созданную в другом учебном году.");
-        }
+            // Нельзя принять заявку из другого учебного года.
+            if (!mentorship.getAcademicYear().getId().equals(currentAcademicYear.getId())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Нельзя принять заявку, созданную в другом учебном году.");
+            }
 
-        if (request.decision() == MentorshipDecision.ACCEPT
-                && !mentorParticipationRepository.existsByMentor_IdAndAcademicYear_IdAndParticipatedTrue(mentor.getId(), currentAcademicYear.getId())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Вы не подтвердили участие в текущем учебном году.");
+            // Наставник должен подтвердить участие в текущем году.
+            if (!mentorParticipationRepository.existsByMentor_IdAndAcademicYear_IdAndParticipatedTrue(mentor.getId(), currentAcademicYear.getId())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Вы не подтвердили участие в текущем учебном году.");
+            }
         }
 
         MentorshipStatus oldStatus = mentorship.getStatus();
