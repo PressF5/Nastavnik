@@ -2,6 +2,7 @@ package org.donriro.nastavnik.user.service;
 
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
+import org.donriro.nastavnik.mentorship.service.MentorParticipationService;
 import org.donriro.nastavnik.profile.value.dto.ProfileValueResponse;
 import org.donriro.nastavnik.profile.value.service.ProfileValueService;
 import org.donriro.nastavnik.user.dto.response.UserProfileResponse;
@@ -32,6 +33,7 @@ public class UserApprovalService {
     private final UserRepository userRepository;
     private final UserAuditLogRepository userAuditLogRepository;
     private final ProfileValueService profileValueService;
+    private final MentorParticipationService mentorParticipationService;
 
     public List<User> getPendingUsers(Long actorId) {
         User actor = getUser(actorId);
@@ -70,6 +72,7 @@ public class UserApprovalService {
         target.setAccountStatus(AccountStatus.ACCEPTED);
 
         User savedUser = userRepository.save(target);
+        mentorParticipationService.ensureParticipationForNotCompletedYears(savedUser);
 
         UserAuditLog auditLog = new UserAuditLog();
         auditLog.setUser(target);
@@ -272,6 +275,11 @@ public class UserApprovalService {
         target.setBlocked(newBlockedStatus);
         User savedUser = userRepository.save(target);
 
+        // При разблокировке восстанавливаем отсутствующие записи участия наставника.
+        if (!newBlockedStatus) {
+            mentorParticipationService.ensureParticipationForNotCompletedYears(savedUser);
+        }
+
         // Сохраняем историю изменения блокировки.
         UserAuditLog auditLog = new UserAuditLog();
         auditLog.setUser(savedUser);
@@ -291,18 +299,29 @@ public class UserApprovalService {
     private User changeStatus(Long actorId, Long targetId, AccountStatus newStatus) {
         User actor = getUser(actorId);
         User target = getUser(targetId);
+
         if (actor.getId().equals(target.getId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Нельзя согласовать собственную заявку.");
         }
+
         if (!canManage(actor, target)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "У вас нет прав на обработку этой заявки.");
         }
+
         if (target.getAccountStatus() != AccountStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Заявка уже обработана.");
         }
+
         AccountStatus oldStatus = target.getAccountStatus();
         target.setAccountStatus(newStatus);
+
         User savedUser = userRepository.save(target);
+
+        // Создаём записи участия, если подтверждённый пользователь является наставником.
+        if (newStatus == AccountStatus.ACCEPTED) {
+            mentorParticipationService.ensureParticipationForNotCompletedYears(savedUser);
+        }
+
         UserAuditLog auditLog = new UserAuditLog();
         auditLog.setUser(target);
         auditLog.setActor(actor);
@@ -313,6 +332,7 @@ public class UserApprovalService {
         auditLog.setNewIsBlocked(target.isBlocked());
         auditLog.setSource(AuditSource.USER);
         userAuditLogRepository.save(auditLog);
+
         return savedUser;
     }
 
