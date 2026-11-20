@@ -50,25 +50,32 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
      * Ожидающие заявки в лимит не входят.
      */
     @Query("""
-    select u
-    from User u
-    join fetch u.role
-    join fetch u.region
-    left join fetch u.msu
-    left join fetch u.educationalOrganization
-    where u.role.code = :roleCode
-      and u.msu.id = :msuId
-      and u.accountStatus = :status
-      and u.blocked = false
-      and (
-          select count(m.id)
-          from Mentorship m
-          where m.mentor.id = u.id
-            and m.academicYear.id = :academicYearId
-            and m.status = :mentorshipStatus
-      ) < 3
-    order by u.lastName, u.firstName, u.middleName
-    """)
+            select u
+            from User u
+            join fetch u.role
+            join fetch u.region
+            left join fetch u.msu
+            left join fetch u.educationalOrganization
+            where u.role.code = :roleCode
+              and u.msu.id = :msuId
+              and u.accountStatus = :status
+              and u.blocked = false
+              and exists (
+                  select mp.id
+                  from MentorParticipation mp
+                  where mp.mentor.id = u.id
+                    and mp.academicYear.id = :academicYearId
+                    and mp.participated = true
+              )
+              and (
+                  select count(m.id)
+                  from Mentorship m
+                  where m.mentor.id = u.id
+                    and m.academicYear.id = :academicYearId
+                    and m.status = :mentorshipStatus
+              ) < 3
+              order by u.lastName, u.firstName, u.middleName
+            """)
     List<User> findEligibleMentors(@Param("roleCode") RoleCode roleCode,
                                    @Param("msuId") Long msuId,
                                    @Param("status") AccountStatus status,
