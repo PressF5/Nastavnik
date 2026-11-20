@@ -27,7 +27,4 @@ public class AcademicYear extends BaseEntity {
 
     @Column(name = "end_date", nullable = false)
     private LocalDate endDate;
-
-    @Column(nullable = false)
-    private boolean active = false;
 }

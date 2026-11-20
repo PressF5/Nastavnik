@@ -105,9 +105,11 @@ public class MentorshipService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Совместимость наставника и наставляемого должна быть выше 50%.");
         }
 
+        LocalDate today = LocalDate.now();
+
         AcademicYear academicYear = academicYearRepository
-                .findByActiveTrue()
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Не найден активный учебный год."));
+                .findByDate(today)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "На текущую дату не найден действующий учебный год."));
 
         List<MentorshipStatus> occupiedStatuses = List.of(MentorshipStatus.PENDING, MentorshipStatus.ACCEPTED);
 
