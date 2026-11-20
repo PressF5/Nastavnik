@@ -2,6 +2,8 @@ package org.donriro.nastavnik.matching.service;
 
 import lombok.RequiredArgsConstructor;
 import org.donriro.nastavnik.matching.dto.MentorMatchingResponse;
+import org.donriro.nastavnik.mentorship.entity.AcademicYear;
+import org.donriro.nastavnik.mentorship.repository.AcademicYearRepository;
 import org.donriro.nastavnik.mentorship.repository.MentorshipRepository;
 import org.donriro.nastavnik.mentorship.status.MentorshipStatus;
 import org.donriro.nastavnik.profile.value.repository.ProfileValueRepository;
@@ -20,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -33,11 +36,14 @@ public class MentorMatchingService {
 
     private static final String MENTOR_READINESS_FIELD_NAME = "Готовность к наставничеству";
 
+    private final Clock clock;
+
     private final UserRepository userRepository;
     private final ProfileCompatibilityCalculator compatibilityCalculator;
     private final MentorshipRepository mentorshipRepository;
     private final ProfileValueRepository profileValueRepository;
     private final ProfileValueService profileValueService;
+    private final AcademicYearRepository academicYearRepository;
 
     public List<MentorMatchingResponse> findMentorsFor(User mentee) {
         if (mentee == null || mentee.getId() == null) {
@@ -56,14 +62,18 @@ public class MentorMatchingService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Наставляемый должен иметь подтверждённую и активную учётную запись.");
         }
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
 
         if (mentee.getBirthDate() == null || mentee.getBirthDate().isAfter(today) || !mentee.getBirthDate().isAfter(today.minusYears(36))) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Наставляемый должен быть не старше 35 лет.");
         }
 
+        AcademicYear academicYear = academicYearRepository
+                .findByDate(today)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "На текущую дату не найден действующий учебный год."));
+
         Long msuId = mentee.getMsu().getId();
-        List<User> mentors = userRepository.findEligibleMentors(RoleCode.MENTOR, msuId, AccountStatus.ACCEPTED, MentorshipStatus.ACCEPTED);
+        List<User> mentors = userRepository.findEligibleMentors(RoleCode.MENTOR, msuId, AccountStatus.ACCEPTED, MentorshipStatus.ACCEPTED, academicYear.getId());
 
         // Получаем ID наставников, подтвердивших готовность к наставничеству.
         Set<Long> mentorIds = mentors.stream()

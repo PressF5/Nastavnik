@@ -64,11 +64,16 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
           select count(m.id)
           from Mentorship m
           where m.mentor.id = u.id
+            and m.academicYear.id = :academicYearId
             and m.status = :mentorshipStatus
       ) < 3
     order by u.lastName, u.firstName, u.middleName
     """)
-    List<User> findEligibleMentors(@Param("roleCode") RoleCode roleCode, @Param("msuId") Long msuId, @Param("status") AccountStatus status, @Param("mentorshipStatus") MentorshipStatus mentorshipStatus);
+    List<User> findEligibleMentors(@Param("roleCode") RoleCode roleCode,
+                                   @Param("msuId") Long msuId,
+                                   @Param("status") AccountStatus status,
+                                   @Param("mentorshipStatus") MentorshipStatus mentorshipStatus,
+                                   @Param("academicYearId") Long academicYearId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
@@ -102,6 +107,7 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
                   select m.id
                   from Mentorship m
                   where m.mentee.id = u.id
+                    and m.academicYear.id = :academicYearId
                     and m.status in :excludedStatuses
               )
             order by u.lastName, u.firstName, u.middleName
@@ -112,7 +118,8 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
             @Param("accountStatus") AccountStatus accountStatus,
             @Param("excludedStatuses") List<MentorshipStatus> excludedStatuses,
             @Param("today") LocalDate today,
-            @Param("oldestAllowedBirthDateExclusive") LocalDate oldestAllowedBirthDateExclusive
+            @Param("oldestAllowedBirthDateExclusive") LocalDate oldestAllowedBirthDateExclusive,
+            @Param("academicYearId") Long academicYearId
     );
 
     @EntityGraph(attributePaths = {"role", "region", "msu", "educationalOrganization", "educationalOrganization.msu"})

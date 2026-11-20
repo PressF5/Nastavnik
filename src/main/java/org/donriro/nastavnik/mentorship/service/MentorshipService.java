@@ -310,7 +310,8 @@ public class MentorshipService {
 
         // После принятия третьего наставляемого автоматически отклоняем остальные заявки.
         if (request.decision() == MentorshipDecision.ACCEPT) {
-            long activeMentees = mentorshipRepository.countByMentor_IdAndStatus(mentor.getId(), MentorshipStatus.ACCEPTED);
+            long activeMentees = mentorshipRepository
+                    .countByMentor_IdAndAcademicYear_IdAndStatus(mentor.getId(), mentorship.getAcademicYear().getId(), MentorshipStatus.ACCEPTED);
 
             if (activeMentees >= 3) {
                 List<Mentorship> pendingRequests = mentorshipRepository
@@ -526,8 +527,11 @@ public class MentorshipService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "У администратора не настроена организационная принадлежность.");
         }
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
         LocalDate oldestAllowedBirthDateExclusive = today.minusYears(MAX_MENTEE_AGE + 1L);
+        AcademicYear academicYear = academicYearRepository
+                .findByDate(today)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "На текущую дату не найден действующий учебный год."));
 
         return userRepository.findAvailableMentees(
                         RoleCode.MENTEE,
@@ -535,7 +539,8 @@ public class MentorshipService {
                         AccountStatus.ACCEPTED,
                         List.of(MentorshipStatus.PENDING, MentorshipStatus.ACCEPTED),
                         today,
-                        oldestAllowedBirthDateExclusive)
+                        oldestAllowedBirthDateExclusive,
+                        academicYear.getId())
                 .stream()
                 .map(mentee -> new AvailableMenteeResponse(
                         mentee.getId(),
