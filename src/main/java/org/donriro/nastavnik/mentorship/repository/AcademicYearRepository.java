@@ -56,4 +56,10 @@ public interface AcademicYearRepository extends JpaRepository<AcademicYear, Long
     boolean existsByName(String name);
     boolean existsByNameAndIdNot(String name, Long id);
     List<AcademicYear> findAllByOrderByStartDateDesc();
+
+    /**
+     * Возвращает учебные годы, которые ещё не завершились.
+     * Включает запланированные и активные учебные годы.
+     */
+    List<AcademicYear> findAllByEndDateGreaterThanEqualOrderByStartDateAsc(LocalDate today);
 }
