@@ -132,11 +132,22 @@ public class AcademicYearService {
 
     /**
      * Возвращает учебный год по идентификатору.
+     * Наставник и наставляемый не могут просматривать будущие учебные годы.
      */
     public AcademicYearResponse getById(Long id) {
-        getCurrentUser();
+        User currentUser = getCurrentUser();
 
         AcademicYear academicYear = findAcademicYear(id);
+
+        RoleCode roleCode = currentUser.getRole() != null ? currentUser.getRole().getCode() : null;
+
+        if (roleCode == RoleCode.MENTOR || roleCode == RoleCode.MENTEE) {
+            LocalDate today = LocalDate.now(clock);
+
+            if (academicYear.getStartDate().isAfter(today)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Просмотр будущих учебных годов недоступен.");
+            }
+        }
 
         return toResponse(academicYear);
     }
