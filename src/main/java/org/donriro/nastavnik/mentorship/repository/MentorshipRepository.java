@@ -42,6 +42,7 @@ public interface MentorshipRepository extends JpaRepository<Mentorship, Long> {
                 JOIN m.mentor mentor
                 WHERE mentee.educationalOrganization.id = :organizationId
                   AND (:status IS NULL OR m.status = :status)
+                  AND m.academicYear.id = :academicYearId
                   AND (
                       :search = ''
                       OR LOWER(
@@ -71,6 +72,7 @@ public interface MentorshipRepository extends JpaRepository<Mentorship, Long> {
                 JOIN m.mentor mentor
                 WHERE mentee.educationalOrganization.id = :organizationId
                   AND (:status IS NULL OR m.status = :status)
+                  AND m.academicYear.id = :academicYearId
                   AND (
                       :search = ''
                       OR LOWER(
@@ -96,6 +98,7 @@ public interface MentorshipRepository extends JpaRepository<Mentorship, Long> {
     )
     Page<Mentorship> findAllForOrganization(
             @Param("organizationId") Long organizationId,
+            @Param("academicYearId") Long academicYearId,
             @Param("status") MentorshipStatus status,
             @Param("search") String search,
             Pageable pageable);
