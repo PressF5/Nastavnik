@@ -28,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -38,13 +39,16 @@ import java.util.Optional;
 @Transactional(readOnly = true)
 public class MentorshipService {
 
+    private static final int MAX_MENTEE_AGE = 35;
+
+    private final Clock clock;
+
     private final MentorshipRepository mentorshipRepository;
     private final AcademicYearRepository academicYearRepository;
     private final MentorshipAuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
     private final ProfileCompatibilityCalculator compatibilityCalculator;
     private final ProfileValueService profileValueService;
-    private static final int MAX_MENTEE_AGE = 35;
 
     /**
      * Администратор ОО создаёт предварительную заявку
@@ -105,7 +109,7 @@ public class MentorshipService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Совместимость наставника и наставляемого должна быть выше 50%.");
         }
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
 
         AcademicYear academicYear = academicYearRepository
                 .findByDate(today)
