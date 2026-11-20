@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -23,7 +24,7 @@ public interface AcademicYearRepository extends JpaRepository<AcademicYear, Long
     Optional<AcademicYear> findByDate(@Param("date") LocalDate date);
 
     /**
-     * Проверяет, пересекается ли новый период с существующими учебными годами.
+     * Проверяет пересечение периода с любым существующим учебным годом.
      */
     @Query("""
             SELECT COUNT(ay) > 0
@@ -31,6 +32,28 @@ public interface AcademicYearRepository extends JpaRepository<AcademicYear, Long
             WHERE ay.startDate <= :endDate
               AND ay.endDate >= :startDate
             """)
-    boolean existsOverlappingPeriod(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+    boolean existsOverlappingPeriod(
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    /**
+     * Проверяет пересечение при редактировании, исключая сам учебный год.
+     */
+    @Query("""
+            SELECT COUNT(ay) > 0
+            FROM AcademicYear ay
+            WHERE ay.id <> :id
+              AND ay.startDate <= :endDate
+              AND ay.endDate >= :startDate
+            """)
+    boolean existsOverlappingPeriodExcludingId(
+            @Param("id") Long id,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    boolean existsByName(String name);
+    boolean existsByNameAndIdNot(String name, Long id);
     List<AcademicYear> findAllByOrderByStartDateDesc();
 }
