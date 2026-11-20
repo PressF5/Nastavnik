@@ -26,6 +26,10 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     boolean existsByRoleCodeAndMsuIdAndAccountStatusIn(RoleCode roleCode, Long id, List<AccountStatus> activeAdminStatuses);
     boolean existsByRoleCodeAndEducationalOrganizationIdAndAccountStatusIn(RoleCode roleCode, Long educationalOrganizationId, List<AccountStatus> statuses);
     List<User> findAllByAccountStatus(AccountStatus status);
+    /**
+     * Возвращает всех подтверждённых и незаблокированных наставников.
+     */
+    List<User> findAllByRole_CodeAndAccountStatusAndBlockedFalse(RoleCode roleCode, AccountStatus accountStatus);
 
     @Query("""
         select u
