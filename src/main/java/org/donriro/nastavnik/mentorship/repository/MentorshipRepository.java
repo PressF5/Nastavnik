@@ -102,4 +102,19 @@ public interface MentorshipRepository extends JpaRepository<Mentorship, Long> {
 
     // Текущее назначение наставляемого: ожидающее или действующее.
     Optional<Mentorship> findFirstByMentee_IdAndStatusInOrderByCreatedAtDesc(Long menteeId, List<MentorshipStatus> statuses);
+
+    // Подсчитывает действующих наставляемых наставника в конкретном учебном году.
+    long countByMentor_IdAndAcademicYear_IdAndStatus(Long mentorId, Long academicYearId, MentorshipStatus status);
+
+    // Проверяет наличие ожидающей или действующей пары наставляемого в конкретном году.
+    boolean existsByMentee_IdAndAcademicYear_IdAndStatusIn(Long menteeId, Long academicYearId, List<MentorshipStatus> statuses);
+
+    // Возвращает заявки наставника за конкретный учебный год.
+    List<Mentorship> findAllByMentor_IdAndAcademicYear_IdAndStatusOrderByCreatedAtDesc(Long mentorId, Long academicYearId, MentorshipStatus status);
+
+    // Возвращает действующие пары наставника за конкретный учебный год.
+    List<Mentorship> findAllByMentor_IdAndAcademicYear_IdAndStatusOrderByStartedAtDesc(Long mentorId, Long academicYearId, MentorshipStatus status);
+
+    // Находит ожидающую или действующую пару наставляемого в конкретном году.
+    Optional<Mentorship> findFirstByMentee_IdAndAcademicYear_IdAndStatusInOrderByCreatedAtDesc(Long menteeId, Long academicYearId, List<MentorshipStatus> statuses);
 }

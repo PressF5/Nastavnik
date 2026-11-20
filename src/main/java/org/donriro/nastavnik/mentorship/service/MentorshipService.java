@@ -94,8 +94,15 @@ public class MentorshipService {
         requireActiveAccount(mentor);
         requireAllowedMenteeAge(mentee);
 
+        LocalDate today = LocalDate.now(clock);
+
+        AcademicYear academicYear = academicYearRepository
+                .findByDate(today)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "На текущую дату не найден действующий учебный год."));
+
         // Не создаём новые заявки наставнику, который уже достиг лимита.
-        long activeMentees = mentorshipRepository.countByMentor_IdAndStatus(mentor.getId(), MentorshipStatus.ACCEPTED);
+        long activeMentees = mentorshipRepository
+                .countByMentor_IdAndAcademicYear_IdAndStatus(mentor.getId(), academicYear.getId(), MentorshipStatus.ACCEPTED);
         if (activeMentees >= 3) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Наставник уже имеет трёх действующих наставляемых.");
         }
@@ -109,18 +116,12 @@ public class MentorshipService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Совместимость наставника и наставляемого должна быть выше 50%.");
         }
 
-        LocalDate today = LocalDate.now(clock);
-
-        AcademicYear academicYear = academicYearRepository
-                .findByDate(today)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "На текущую дату не найден действующий учебный год."));
-
         List<MentorshipStatus> occupiedStatuses = List.of(MentorshipStatus.PENDING, MentorshipStatus.ACCEPTED);
 
         // Не допускаем несколько ожидающих заявок
         // или действующих наставников у одного наставляемого.
-        if (mentorshipRepository.existsByMentee_IdAndStatusIn(mentee.getId(), occupiedStatuses)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "У наставляемого уже есть ожидающая заявка или действующий наставник.");
+        if (mentorshipRepository.existsByMentee_IdAndAcademicYear_IdAndStatusIn(mentee.getId(), academicYear.getId(), occupiedStatuses)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "У наставляемого уже есть ожидающая заявка или действующий наставник в текущем учебном году.");
         }
 
         Mentorship mentorship = new Mentorship();
@@ -224,6 +225,17 @@ public class MentorshipService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Заявка уже обработана.");
         }
 
+        LocalDate today = LocalDate.now(clock);
+
+        AcademicYear currentAcademicYear = academicYearRepository
+                .findByDate(today)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "На текущую дату не найден действующий учебный год."));
+
+        if (request.decision() == MentorshipDecision.ACCEPT
+                && !mentorship.getAcademicYear().getId().equals(currentAcademicYear.getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Нельзя принять заявку, созданную в другом учебном году.");
+        }
+
         MentorshipStatus oldStatus = mentorship.getStatus();
 
         if (request.decision() == MentorshipDecision.ACCEPT) {
@@ -253,7 +265,8 @@ public class MentorshipService {
 
             // После получения блокировки проверяем актуальное состояние.
             // У наставляемого может быть только один действующий наставник.
-            boolean alreadyHasMentor = mentorshipRepository.existsByMentee_IdAndStatusIn(mentee.getId(), List.of(MentorshipStatus.ACCEPTED));
+            boolean alreadyHasMentor = mentorshipRepository
+                    .existsByMentee_IdAndAcademicYear_IdAndStatusIn(mentee.getId(), mentorship.getAcademicYear().getId(), List.of(MentorshipStatus.ACCEPTED));
 
             if (alreadyHasMentor) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "У наставляемого уже есть действующий наставник.");
@@ -261,7 +274,8 @@ public class MentorshipService {
 
             // Считаем только действующие назначения.
             // Заявки PENDING в лимит не входят.
-            long activeMentees = mentorshipRepository.countByMentor_IdAndStatus(mentor.getId(), MentorshipStatus.ACCEPTED);
+            long activeMentees = mentorshipRepository
+                    .countByMentor_IdAndAcademicYear_IdAndStatus(mentor.getId(), mentorship.getAcademicYear().getId(), MentorshipStatus.ACCEPTED);
 
             if (activeMentees >= 3) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Наставник уже имеет трёх действующих наставляемых.");
@@ -300,7 +314,7 @@ public class MentorshipService {
 
             if (activeMentees >= 3) {
                 List<Mentorship> pendingRequests = mentorshipRepository
-                        .findAllByMentor_IdAndStatusOrderByCreatedAtDesc(mentor.getId(), MentorshipStatus.PENDING);
+                        .findAllByMentor_IdAndAcademicYear_IdAndStatusOrderByCreatedAtDesc(mentor.getId(), mentorship.getAcademicYear().getId(), MentorshipStatus.PENDING);
                 String rejectionReason = "Наставник достиг максимального количества действующих наставляемых";
 
                 for (Mentorship pendingRequest : pendingRequests) {
