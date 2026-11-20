@@ -564,11 +564,13 @@ public class MentorshipService {
                 .toList();
     }
 
+
     /**
      * Возвращает назначения наставничества наставляемых
-     * образовательной организации текущего администратора.
+     * образовательной организации текущего администратора
+     * за выбранный учебный год.
      */
-    public Page<MentorshipResponse> getOrganizationMentorships(MentorshipStatus status, String search, Pageable pageable) {
+    public Page<MentorshipResponse> getOrganizationMentorships(Long academicYearId, MentorshipStatus status, String search, Pageable pageable) {
         User admin = getCurrentUser();
 
         requireRole(admin, RoleCode.OO_ADMIN);
@@ -578,13 +580,28 @@ public class MentorshipService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "У администратора не настроена организационная принадлежность.");
         }
 
+        // Если год не передан, используем текущий учебный год.
+        AcademicYear academicYear;
+
+        if (academicYearId == null) {
+            LocalDate today = LocalDate.now(clock);
+
+            academicYear = academicYearRepository.findByDate(today)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "На текущую дату не найден действующий учебный год."));
+        } else {
+            academicYear = academicYearRepository.findById(academicYearId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Учебный год не найден."));
+        }
+
         String normalizedSearch = search == null || search.isBlank() ? "" : search.trim().toLowerCase();
 
         return mentorshipRepository.findAllForOrganization(
                         admin.getEducationalOrganization().getId(),
+                        academicYear.getId(),
                         status,
                         normalizedSearch,
-                        pageable)
+                        pageable
+                )
                 .map(this::toResponse);
     }
 

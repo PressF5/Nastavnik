@@ -75,6 +75,7 @@ public class MentorshipController {
     @GetMapping("/api/admin/mentorship-assignments")
     @PreAuthorize("hasRole('OO_ADMIN')")
     public ResponseEntity<Page<MentorshipResponse>> getOrganizationMentorships(
+            @RequestParam(required = false) Long academicYearId,
             @RequestParam(required = false) MentorshipStatus status,
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
@@ -82,12 +83,10 @@ public class MentorshipController {
         int safePage = Math.max(page, 0);
         int safeSize = Math.clamp(size, 1, 50);
 
-        Pageable pageable = PageRequest.of(
-                safePage,
-                safeSize,
-                Sort.by(Sort.Direction.DESC, "createdAt"));
+        Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
 
-        return ResponseEntity.ok(mentorshipService.getOrganizationMentorships(status, search, pageable));
+        return ResponseEntity.ok(
+                mentorshipService.getOrganizationMentorships(academicYearId, status, search, pageable));
     }
 
     @GetMapping("/api/mentee/mentorship")
