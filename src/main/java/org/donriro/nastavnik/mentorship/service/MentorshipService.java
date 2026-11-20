@@ -683,21 +683,29 @@ public class MentorshipService {
     }
 
     /**
-     * Возвращает указанный учебный год.
+     * Возвращает учебный год для просмотра наставником или наставляемым.
      * Если идентификатор не передан, используется текущий год.
+     * Будущие учебные годы недоступны для просмотра.
      */
     private AcademicYear resolveAcademicYear(Long academicYearId) {
-        if (academicYearId != null) {
-            return academicYearRepository.findById(academicYearId)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Учебный год не найден."));
-        }
-
         LocalDate today = LocalDate.now(clock);
 
-        return academicYearRepository.findByDate(today)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "На текущую дату не найден действующий учебный год."));
-    }
+        AcademicYear academicYear;
 
+        if (academicYearId != null) {
+            academicYear = academicYearRepository.findById(academicYearId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Учебный год не найден."));
+        } else {
+            academicYear = academicYearRepository.findByDate(today)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "На текущую дату не найден действующий учебный год."));
+        }
+
+        if (academicYear.getStartDate().isAfter(today)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Просмотр будущих учебных годов недоступен.");
+        }
+
+        return academicYear;
+    }
 
     /**
      * Проверяет, соответствует ли наставляемый возрастному ограничению.
