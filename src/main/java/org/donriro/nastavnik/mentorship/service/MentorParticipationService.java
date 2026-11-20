@@ -25,6 +25,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -52,15 +53,27 @@ public class MentorParticipationService {
 
         LocalDate today = LocalDate.now(clock);
 
-        List<AcademicYear> academicYears = academicYearRepository.findAllByEndDateGreaterThanEqualOrderByStartDateAsc(today);
+        // Получаем все учебные годы, которые ещё не завершились.
+        List<AcademicYear> academicYears =
+                academicYearRepository.findAllByEndDateGreaterThanEqualOrderByStartDateAsc(today);
+
+        if (academicYears.isEmpty()) {
+            return;
+        }
+
+        // Собираем ID учебных годов.
+        List<Long> academicYearIds = academicYears.stream()
+                .map(AcademicYear::getId)
+                .toList();
+
+        // Одним запросом получаем годы, для которых записи уже существуют.
+        Set<Long> existingAcademicYearIds =
+                mentorParticipationRepository.findExistingAcademicYearIds(mentor.getId(), Set.copyOf(academicYearIds));
+
         List<MentorParticipation> newParticipations = new ArrayList<>();
 
         for (AcademicYear academicYear : academicYears) {
-            boolean alreadyExists = mentorParticipationRepository
-                    .findByMentorIdAndAcademicYearId(mentor.getId(), academicYear.getId())
-                    .isPresent();
-
-            if (alreadyExists) {
+            if (existingAcademicYearIds.contains(academicYear.getId())) {
                 continue;
             }
 
