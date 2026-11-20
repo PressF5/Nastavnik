@@ -13,4 +13,9 @@ public interface MentorParticipationRepository extends JpaRepository<MentorParti
      * Находит подтверждение участия наставника в конкретном учебном году.
      */
     Optional<MentorParticipation> findByMentorIdAndAcademicYearId(Long mentorId, Long academicYearId);
+
+    /**
+     * Проверяет, подтвердил ли наставник участие в конкретном учебном году.
+     */
+    boolean existsByMentor_IdAndAcademicYear_IdAndParticipatedTrue(Long mentorId, Long academicYearId);
 }

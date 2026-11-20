@@ -7,6 +7,7 @@ import org.donriro.nastavnik.mentorship.entity.AcademicYear;
 import org.donriro.nastavnik.mentorship.entity.Mentorship;
 import org.donriro.nastavnik.mentorship.entity.MentorshipAuditLog;
 import org.donriro.nastavnik.mentorship.repository.AcademicYearRepository;
+import org.donriro.nastavnik.mentorship.repository.MentorParticipationRepository;
 import org.donriro.nastavnik.mentorship.repository.MentorshipAuditLogRepository;
 import org.donriro.nastavnik.mentorship.repository.MentorshipRepository;
 import org.donriro.nastavnik.mentorship.status.MentorshipDecision;
@@ -49,6 +50,7 @@ public class MentorshipService {
     private final UserRepository userRepository;
     private final ProfileCompatibilityCalculator compatibilityCalculator;
     private final ProfileValueService profileValueService;
+    private final MentorParticipationRepository mentorParticipationRepository;
 
     /**
      * Администратор ОО создаёт предварительную заявку
@@ -99,6 +101,11 @@ public class MentorshipService {
         AcademicYear academicYear = academicYearRepository
                 .findByDate(today)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "На текущую дату не найден действующий учебный год."));
+
+        // Наставник должен подтвердить участие в текущем учебном году.
+        if (!mentorParticipationRepository.existsByMentor_IdAndAcademicYear_IdAndParticipatedTrue(mentor.getId(), academicYear.getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Наставник не подтвердил участие в текущем учебном году.");
+        }
 
         // Не создаём новые заявки наставнику, который уже достиг лимита.
         long activeMentees = mentorshipRepository
@@ -234,6 +241,11 @@ public class MentorshipService {
         if (request.decision() == MentorshipDecision.ACCEPT
                 && !mentorship.getAcademicYear().getId().equals(currentAcademicYear.getId())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Нельзя принять заявку, созданную в другом учебном году.");
+        }
+
+        if (request.decision() == MentorshipDecision.ACCEPT
+                && !mentorParticipationRepository.existsByMentor_IdAndAcademicYear_IdAndParticipatedTrue(mentor.getId(), currentAcademicYear.getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Вы не подтвердили участие в текущем учебном году.");
         }
 
         MentorshipStatus oldStatus = mentorship.getStatus();
