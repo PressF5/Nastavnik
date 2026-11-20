@@ -149,31 +149,44 @@ public class MentorshipService {
      * Наставник видит только ожидающие заявки,
      * которые адресованы именно ему.
      */
-    public List<MentorshipResponse> getCurrentMentorRequests() {
+
+    public List<MentorshipResponse> getCurrentMentorRequests(Long academicYearId) {
         User mentor = getCurrentUser();
 
         requireRole(mentor, RoleCode.MENTOR);
         requireActiveAccount(mentor);
 
+        AcademicYear academicYear = resolveAcademicYear(academicYearId);
+
         return mentorshipRepository
-                .findAllByMentor_IdAndStatusOrderByCreatedAtDesc(mentor.getId(), MentorshipStatus.PENDING)
+                .findAllByMentor_IdAndAcademicYear_IdAndStatusOrderByCreatedAtDesc(
+                        mentor.getId(),
+                        academicYear.getId(),
+                        MentorshipStatus.PENDING)
                 .stream()
                 .map(this::toResponse)
                 .toList();
     }
 
+
     /**
      * Возвращает список действующих наставляемых
      * текущего наставника.
      */
-    public List<MentorshipResponse> getCurrentMentorMentees() {
+
+    public List<MentorshipResponse> getCurrentMentorMentees(Long academicYearId) {
         User mentor = getCurrentUser();
 
         requireRole(mentor, RoleCode.MENTOR);
         requireActiveAccount(mentor);
 
+        AcademicYear academicYear = resolveAcademicYear(academicYearId);
+
         return mentorshipRepository
-                .findAllByMentor_IdAndStatusOrderByStartedAtDesc(mentor.getId(), MentorshipStatus.ACCEPTED)
+                .findAllByMentor_IdAndAcademicYear_IdAndStatusOrderByStartedAtDesc(
+                        mentor.getId(),
+                        academicYear.getId(),
+                        MentorshipStatus.ACCEPTED)
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -658,6 +671,23 @@ public class MentorshipService {
                 })
                 .toList();
     }
+
+    /**
+     * Возвращает указанный учебный год.
+     * Если идентификатор не передан, используется текущий год.
+     */
+    private AcademicYear resolveAcademicYear(Long academicYearId) {
+        if (academicYearId != null) {
+            return academicYearRepository.findById(academicYearId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Учебный год не найден."));
+        }
+
+        LocalDate today = LocalDate.now(clock);
+
+        return academicYearRepository.findByDate(today)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "На текущую дату не найден действующий учебный год."));
+    }
+
 
     /**
      * Проверяет, соответствует ли наставляемый возрастному ограничению.
