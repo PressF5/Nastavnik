@@ -120,4 +120,15 @@ public interface MentorshipRepository extends JpaRepository<Mentorship, Long> {
 
     // Находит ожидающую или действующую пару наставляемого в конкретном году.
     Optional<Mentorship> findFirstByMentee_IdAndAcademicYear_IdAndStatusInOrderByCreatedAtDesc(Long menteeId, Long academicYearId, List<MentorshipStatus> statuses);
+
+    /**
+     * Находит действующую пару наставника и наставляемого
+     * в конкретном учебном году.
+     */
+    Optional<Mentorship> findFirstByMentor_IdAndMentee_IdAndAcademicYear_IdAndStatusOrderByStartedAtDesc(
+            Long mentorId,
+            Long menteeId,
+            Long academicYearId,
+            MentorshipStatus status
+    );
 }

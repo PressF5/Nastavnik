@@ -50,8 +50,8 @@ public class MentorshipController {
 
     @GetMapping("/api/mentor/mentees/{menteeId}")
     @PreAuthorize("hasRole('MENTOR')")
-    public ResponseEntity<MenteeProfileResponse> getMenteeProfile(@PathVariable Long menteeId) {
-        return ResponseEntity.ok(mentorshipService.getMenteeProfile(menteeId));
+    public ResponseEntity<MenteeProfileResponse> getMenteeProfile(@PathVariable Long menteeId, @RequestParam(required = false) Long academicYearId) {
+        return ResponseEntity.ok(mentorshipService.getMenteeProfile(menteeId, academicYearId));
     }
 
     @PatchMapping("/api/mentor/mentorship-assignments/{id}/end")
@@ -104,8 +104,8 @@ public class MentorshipController {
      */
     @GetMapping("/api/mentee/mentor")
     @PreAuthorize("hasRole('MENTEE')")
-    public ResponseEntity<MentorProfileResponse> getCurrentMenteeMentorProfile() {
-        return ResponseEntity.ok(mentorshipService.getCurrentMenteeMentorProfile());
+    public ResponseEntity<MentorProfileResponse> getCurrentMenteeMentorProfile(@RequestParam(required = false) Long academicYearId) {
+        return ResponseEntity.ok(mentorshipService.getCurrentMenteeMentorProfile(academicYearId));
     }
 
     /**

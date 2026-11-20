@@ -426,20 +426,25 @@ public class MentorshipService {
 
     /**
      * Возвращает карточку наставляемого,
-     * с которым у текущего наставника есть действующее назначение.
+     * с которым у текущего наставника есть действующее назначение
+     * в выбранном учебном году.
      */
-    public MenteeProfileResponse getMenteeProfile(Long menteeId) {
+    public MenteeProfileResponse getMenteeProfile(Long menteeId, Long academicYearId) {
         User mentor = getCurrentUser();
 
         requireRole(mentor, RoleCode.MENTOR);
         requireActiveAccount(mentor);
 
+        AcademicYear academicYear = resolveAcademicYear(academicYearId);
+
         Mentorship mentorship = mentorshipRepository
-                .findAllByMentor_IdAndStatusOrderByStartedAtDesc(mentor.getId(), MentorshipStatus.ACCEPTED)
-                .stream()
-                .filter(item -> item.getMentee().getId().equals(menteeId))
-                .findFirst()
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Действующий наставляемый не найден."));
+                .findFirstByMentor_IdAndMentee_IdAndAcademicYear_IdAndStatusOrderByStartedAtDesc(
+                        mentor.getId(),
+                        menteeId,
+                        academicYear.getId(),
+                        MentorshipStatus.ACCEPTED
+                )
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Действующий наставляемый не найден в выбранном учебном году."));
 
         User mentee = mentorship.getMentee();
 
@@ -449,12 +454,8 @@ public class MentorshipService {
                 mentee.getLastName(),
                 mentee.getMiddleName(),
                 mentee.getBirthDate(),
-                mentee.getRegion() != null
-                        ? mentee.getRegion().getName()
-                        : null,
-                mentee.getMsu() != null
-                        ? mentee.getMsu().getName()
-                        : null,
+                mentee.getRegion() != null ? mentee.getRegion().getName() : null,
+                mentee.getMsu() != null ? mentee.getMsu().getName() : null,
                 mentee.getEducationalOrganization() != null
                         ? mentee.getEducationalOrganization().getName()
                         : null,
@@ -464,18 +465,26 @@ public class MentorshipService {
     }
 
     /**
-     * Возвращает анкету наставника для текущего наставляемого.
-     * Доступ разрешён только при наличии собственного назначения.
+     * Возвращает анкету наставника для выбранного учебного года.
      */
-    public MentorProfileResponse getCurrentMenteeMentorProfile() {
+    public MentorProfileResponse getCurrentMenteeMentorProfile(Long academicYearId) {
         User mentee = getCurrentUser();
 
         requireRole(mentee, RoleCode.MENTEE);
         requireActiveAccount(mentee);
 
+        AcademicYear academicYear = resolveAcademicYear(academicYearId);
+
         Mentorship mentorship = mentorshipRepository
-                .findFirstByMentee_IdAndStatusInOrderByCreatedAtDesc(mentee.getId(), List.of(MentorshipStatus.PENDING, MentorshipStatus.ACCEPTED))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Назначение наставника не найдено."));
+                .findFirstByMentee_IdAndAcademicYear_IdAndStatusInOrderByCreatedAtDesc(
+                        mentee.getId(),
+                        academicYear.getId(),
+                        List.of(MentorshipStatus.PENDING, MentorshipStatus.ACCEPTED)
+                )
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Назначение наставника не найдено в выбранном учебном году."
+                ));
 
         User mentor = mentorship.getMentor();
 
@@ -484,12 +493,8 @@ public class MentorshipService {
                 mentor.getFirstName(),
                 mentor.getLastName(),
                 mentor.getMiddleName(),
-                mentor.getRegion() != null
-                        ? mentor.getRegion().getName()
-                        : null,
-                mentor.getMsu() != null
-                        ? mentor.getMsu().getName()
-                        : null,
+                mentor.getRegion() != null ? mentor.getRegion().getName() : null,
+                mentor.getMsu() != null ? mentor.getMsu().getName() : null,
                 mentor.getEducationalOrganization() != null
                         ? mentor.getEducationalOrganization().getName()
                         : null,
