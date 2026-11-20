@@ -100,8 +100,9 @@ public class AcademicYearService {
     }
 
     /**
-     * Возвращает учебные годы, доступные для просмотра в личном кабинете.
-     * Будущие учебные годы не отображаются.
+     * Возвращает учебные годы, доступные пользователю для просмотра.
+     * Наставники и наставляемые не видят будущие учебные годы.
+     * Администраторы могут просматривать в том числе запланированные годы.
      */
     public List<AcademicYearResponse> getAvailableForCurrentUser() {
         User currentUser = getCurrentUser();
@@ -121,11 +122,18 @@ public class AcademicYearService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "У вас нет доступа к списку учебных годов.");
         }
 
-        LocalDate today = LocalDate.now(clock);
+        List<AcademicYear> academicYears;
 
-        return academicYearRepository
-                .findAllByStartDateLessThanEqualOrderByStartDateDesc(today)
-                .stream()
+        if (roleCode == RoleCode.MENTOR || roleCode == RoleCode.MENTEE) {
+            LocalDate today = LocalDate.now(clock);
+
+            academicYears = academicYearRepository
+                    .findAllByStartDateLessThanEqualOrderByStartDateDesc(today);
+        } else {
+            academicYears = academicYearRepository.findAllByOrderByStartDateDesc();
+        }
+
+        return academicYears.stream()
                 .map(this::toResponse)
                 .toList();
     }
