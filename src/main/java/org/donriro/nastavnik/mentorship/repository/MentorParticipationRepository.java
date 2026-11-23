@@ -50,15 +50,46 @@ public interface MentorParticipationRepository extends JpaRepository<MentorParti
     """)
     void deleteAllByAcademicYearId(@Param("academicYearId") Long academicYearId);
 
+//    /**
+//     * Возвращает ID наставников, у которых уже есть запись участия
+//     * в указанном учебном году.
+//     */
+//    @Query("""
+//    select participation.mentor.id
+//    from MentorParticipation participation
+//    where participation.academicYear.id = :academicYearId
+//      and participation.mentor.id in :mentorIds
+//    """)
+//    Set<Long> findExistingMentorIds(@Param("academicYearId") Long academicYearId, @Param("mentorIds") Set<Long> mentorIds);
+
     /**
-     * Возвращает ID наставников, у которых уже есть запись участия
-     * в указанном учебном году.
+     * Создаёт записи участия для всех действующих наставников,
+     * у которых ещё нет записи в указанном учебном году.
+     * Вставка выполняется непосредственно в PostgreSQL.
      */
-    @Query("""
-    select participation.mentor.id
-    from MentorParticipation participation
-    where participation.academicYear.id = :academicYearId
-      and participation.mentor.id in :mentorIds
-    """)
-    Set<Long> findExistingMentorIds(@Param("academicYearId") Long academicYearId, @Param("mentorIds") Set<Long> mentorIds);
+    @Modifying
+    @Query(value = """
+    INSERT INTO mentor_participation (
+        mentor_id,
+        academic_year_id,
+        participated
+    )
+    SELECT
+        u.id,
+        :academicYearId,
+        FALSE
+    FROM users u
+    JOIN role r ON r.id = u.role_id
+    WHERE r.code = 'MENTOR'
+      AND u.account_status = 'ACCEPTED'
+      AND u.is_blocked = FALSE
+      AND NOT EXISTS (
+          SELECT 1
+          FROM mentor_participation mp
+          WHERE mp.mentor_id = u.id
+            AND mp.academic_year_id = :academicYearId
+      )
+    ON CONFLICT (mentor_id, academic_year_id) DO NOTHING
+    """, nativeQuery = true)
+    int createMissingForActiveMentors(@Param("academicYearId") Long academicYearId);
 }

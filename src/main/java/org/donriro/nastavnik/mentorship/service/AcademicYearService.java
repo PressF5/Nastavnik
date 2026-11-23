@@ -5,7 +5,6 @@ import org.donriro.nastavnik.mentorship.dto.AcademicYearResponse;
 import org.donriro.nastavnik.mentorship.dto.CreateAcademicYearRequest;
 import org.donriro.nastavnik.mentorship.dto.UpdateAcademicYearRequest;
 import org.donriro.nastavnik.mentorship.entity.AcademicYear;
-import org.donriro.nastavnik.mentorship.entity.MentorParticipation;
 import org.donriro.nastavnik.mentorship.repository.AcademicYearRepository;
 import org.donriro.nastavnik.mentorship.repository.MentorParticipationRepository;
 import org.donriro.nastavnik.mentorship.repository.MentorshipRepository;
@@ -25,7 +24,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -92,38 +90,8 @@ public class AcademicYearService {
 
         AcademicYear saved = academicYearRepository.save(academicYear);
 
-        // Получаем всех подтверждённых и незаблокированных наставников.
-        List<User> mentors = userRepository.findAllByRole_CodeAndAccountStatusAndBlockedFalse(
-                RoleCode.MENTOR,
-                AccountStatus.ACCEPTED
-        );
-
-        if (mentors.isEmpty()) {
-            return toResponse(saved);
-        }
-
-        Set<Long> mentorIds = mentors.stream()
-                .map(User::getId)
-                .collect(java.util.stream.Collectors.toSet());
-
-        // Одним запросом проверяем, у кого уже есть запись участия.
-        Set<Long> existingMentorIds =
-                mentorParticipationRepository.findExistingMentorIds(saved.getId(), mentorIds);
-
-        List<MentorParticipation> participations = mentors.stream()
-                .filter(mentor -> !existingMentorIds.contains(mentor.getId()))
-                .map(mentor -> {
-                    MentorParticipation participation = new MentorParticipation();
-                    participation.setMentor(mentor);
-                    participation.setAcademicYear(saved);
-                    participation.setParticipated(false);
-                    return participation;
-                })
-                .toList();
-
-        if (!participations.isEmpty()) {
-            mentorParticipationRepository.saveAll(participations);
-        }
+        // Создаём записи участия непосредственно в PostgreSQL.
+        mentorParticipationRepository.createMissingForActiveMentors(saved.getId());
 
         return toResponse(saved);
     }
