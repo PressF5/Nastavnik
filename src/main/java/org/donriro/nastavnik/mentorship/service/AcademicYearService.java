@@ -229,7 +229,7 @@ public class AcademicYearService {
     }
 
     /**
-     * Удаляет запланированный учебный год, если он ещё не связан
+     * Удаляет неопубликованный учебный год, если он ещё не связан
      * с наставническими парами и подтверждённым участием наставников.
      */
     @Transactional
@@ -240,27 +240,19 @@ public class AcademicYearService {
 
         AcademicYear academicYear = findAcademicYear(id);
 
-        if (getStatus(academicYear) != AcademicYearStatus.PLANNED) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "Удалять можно только запланированный учебный год."
-            );
+        // Удалять можно только неопубликованные учебные годы.
+        if (academicYear.isPublished()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Нельзя удалить опубликованный учебный год.");
         }
 
         // Проверяем наличие наставнических пар независимо от их статуса.
         if (mentorshipRepository.existsByAcademicYear_Id(id)) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "Нельзя удалить учебный год, к которому уже привязаны наставнические пары."
-            );
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Нельзя удалить учебный год, к которому уже привязаны наставнические пары.");
         }
 
         // Проверяем, подтвердил ли хотя бы один наставник участие.
         if (mentorParticipationRepository.existsByAcademicYear_IdAndParticipatedTrue(id)) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "Нельзя удалить учебный год: хотя бы один наставник уже подтвердил участие."
-            );
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Нельзя удалить учебный год: хотя бы один наставник уже подтвердил участие.");
         }
 
         // Удаляем автоматически созданные неподтверждённые записи участия.
