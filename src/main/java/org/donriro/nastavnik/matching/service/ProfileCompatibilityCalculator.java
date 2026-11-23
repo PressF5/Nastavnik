@@ -45,6 +45,10 @@ public class ProfileCompatibilityCalculator {
      * Одиночный расчёт совместимости.
      */
     public ProfileCompatibilityResponse calculate(Long mentorId, Long menteeId) {
+        if (mentorId == null || menteeId == null) {
+            throw new IllegalArgumentException("Необходимо указать ID наставника и наставляемого.");
+        }
+
         return calculateForMentors(List.of(mentorId), menteeId).get(mentorId);
     }
 
