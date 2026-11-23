@@ -1,6 +1,9 @@
 package org.donriro.nastavnik.mentorship.repository;
 
+import org.donriro.nastavnik.mentorship.dto.MentorParticipationAdminResponse;
 import org.donriro.nastavnik.mentorship.entity.MentorParticipation;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -80,4 +83,79 @@ public interface MentorParticipationRepository extends JpaRepository<MentorParti
     ON CONFLICT (mentor_id, academic_year_id) DO NOTHING
     """, nativeQuery = true)
     int createMissingForActiveMentors(@Param("academicYearId") Long academicYearId);
+
+    /**
+     * Возвращает наставников и их подтверждение участия
+     * за выбранный учебный год.
+     *
+     * Поддерживает поиск по ФИО, МСУ и образовательной организации,
+     * а также фильтрацию по признаку участия.
+     */
+    @Query(
+            value = """
+        select new org.donriro.nastavnik.mentorship.dto.MentorParticipationAdminResponse(
+            mentor.id,
+            concat(
+                concat(
+                    concat(coalesce(mentor.lastName, ''), ' '),
+                    coalesce(mentor.firstName, '')
+                ),
+                concat(' ', coalesce(mentor.middleName, ''))
+            ),
+            coalesce(organizationMsu.name, directMsu.name),
+            educationalOrganization.name,
+            participation.participated,
+            mentor.accountStatus,
+            mentor.blocked
+        )
+        from MentorParticipation participation
+        join participation.mentor mentor
+        left join mentor.educationalOrganization educationalOrganization
+        left join educationalOrganization.msu organizationMsu
+        left join mentor.msu directMsu
+        where participation.academicYear.id = :academicYearId
+          and (:participated is null or participation.participated = :participated)
+          and (
+              :search = ''
+              or lower(concat(
+                  coalesce(mentor.lastName, ''), ' ',
+                  coalesce(mentor.firstName, ''), ' ',
+                  coalesce(mentor.middleName, '')
+              )) like lower(concat('%', :search, '%'))
+              or lower(coalesce(organizationMsu.name, directMsu.name, ''))
+                    like lower(concat('%', :search, '%'))
+              or lower(coalesce(educationalOrganization.name, ''))
+                    like lower(concat('%', :search, '%'))
+          )
+        order by mentor.lastName, mentor.firstName, mentor.middleName
+        """,
+            countQuery = """
+        select count(participation)
+        from MentorParticipation participation
+        join participation.mentor mentor
+        left join mentor.educationalOrganization educationalOrganization
+        left join educationalOrganization.msu organizationMsu
+        left join mentor.msu directMsu
+        where participation.academicYear.id = :academicYearId
+          and (:participated is null or participation.participated = :participated)
+          and (
+              :search = ''
+              or lower(concat(
+                  coalesce(mentor.lastName, ''), ' ',
+                  coalesce(mentor.firstName, ''), ' ',
+                  coalesce(mentor.middleName, '')
+              )) like lower(concat('%', :search, '%'))
+              or lower(coalesce(organizationMsu.name, directMsu.name, ''))
+                    like lower(concat('%', :search, '%'))
+              or lower(coalesce(educationalOrganization.name, ''))
+                    like lower(concat('%', :search, '%'))
+          )
+        """
+    )
+    Page<MentorParticipationAdminResponse> findAllForAcademicYear(
+            @Param("academicYearId") Long academicYearId,
+            @Param("participated") Boolean participated,
+            @Param("search") String search,
+            Pageable pageable
+    );
 }
