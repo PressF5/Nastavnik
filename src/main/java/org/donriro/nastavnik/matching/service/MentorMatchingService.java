@@ -35,6 +35,7 @@ import java.util.Set;
 public class MentorMatchingService {
 
     private static final String MENTOR_READINESS_FIELD_NAME = "Готовность к наставничеству";
+    private static final int MIN_COMPARABLE_FIELDS = 3;
 
     private final Clock clock;
 
@@ -103,6 +104,7 @@ public class MentorMatchingService {
                             compatibility.comparableFieldCount()
                     );
                 })
+                .filter(result -> result.comparableFieldCount() >= MIN_COMPARABLE_FIELDS)
                 .filter(result -> result.compatibilityPercentage() != null)
                 .filter(result -> result.compatibilityPercentage().compareTo(BigDecimal.valueOf(50)) > 0)
                 .sorted(Comparator.comparing(MentorMatchingResponse::compatibilityPercentage).reversed())
