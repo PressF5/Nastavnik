@@ -54,8 +54,8 @@ public class MentorParticipationService {
         LocalDate today = LocalDate.now(clock);
 
         // Получаем все учебные годы, которые ещё не завершились.
-        List<AcademicYear> academicYears =
-                academicYearRepository.findAllByEndDateGreaterThanEqualOrderByStartDateAsc(today);
+        List<AcademicYear> academicYears = academicYearRepository
+                        .findAllByPublishedTrueAndEndDateGreaterThanEqualOrderByStartDateAsc(today);
 
         if (academicYears.isEmpty()) {
             return;

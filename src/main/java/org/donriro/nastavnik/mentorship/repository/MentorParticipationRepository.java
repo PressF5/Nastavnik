@@ -50,18 +50,6 @@ public interface MentorParticipationRepository extends JpaRepository<MentorParti
     """)
     void deleteAllByAcademicYearId(@Param("academicYearId") Long academicYearId);
 
-//    /**
-//     * Возвращает ID наставников, у которых уже есть запись участия
-//     * в указанном учебном году.
-//     */
-//    @Query("""
-//    select participation.mentor.id
-//    from MentorParticipation participation
-//    where participation.academicYear.id = :academicYearId
-//      and participation.mentor.id in :mentorIds
-//    """)
-//    Set<Long> findExistingMentorIds(@Param("academicYearId") Long academicYearId, @Param("mentorIds") Set<Long> mentorIds);
-
     /**
      * Создаёт записи участия для всех действующих наставников,
      * у которых ещё нет записи в указанном учебном году.

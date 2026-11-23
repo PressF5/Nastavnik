@@ -11,7 +11,6 @@ import org.donriro.nastavnik.mentorship.repository.MentorshipRepository;
 import org.donriro.nastavnik.mentorship.status.AcademicYearStatus;
 import org.donriro.nastavnik.security.principal.CustomUserDetails;
 import org.donriro.nastavnik.user.entity.User;
-import org.donriro.nastavnik.user.repository.UserRepository;
 import org.donriro.nastavnik.user.role.RoleCode;
 import org.donriro.nastavnik.user.status.AccountStatus;
 import org.springframework.http.HttpStatus;
@@ -34,7 +33,6 @@ public class AcademicYearService {
 
     private final AcademicYearRepository academicYearRepository;
     private final MentorParticipationRepository mentorParticipationRepository;
-    private final UserRepository userRepository;
     private final MentorshipRepository mentorshipRepository;
 
     /**
@@ -139,9 +137,10 @@ public class AcademicYearService {
             LocalDate today = LocalDate.now(clock);
 
             academicYears = academicYearRepository
-                    .findAllByStartDateLessThanEqualOrderByStartDateDesc(today);
+                    .findAllByPublishedTrueAndStartDateLessThanEqualOrderByStartDateDesc(today);
         } else {
-            academicYears = academicYearRepository.findAllByOrderByStartDateDesc();
+            academicYears = academicYearRepository
+                    .findAllByPublishedTrueOrderByStartDateDesc();
         }
 
         return academicYears.stream()
@@ -159,6 +158,11 @@ public class AcademicYearService {
         AcademicYear academicYear = findAcademicYear(id);
 
         RoleCode roleCode = currentUser.getRole() != null ? currentUser.getRole().getCode() : null;
+
+        // Черновики доступны только региональному администратору.
+        if (roleCode != RoleCode.REGION_ADMIN && !academicYear.isPublished()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Учебный год не найден.");
+        }
 
         if (roleCode == RoleCode.MENTOR || roleCode == RoleCode.MENTEE) {
             LocalDate today = LocalDate.now(clock);

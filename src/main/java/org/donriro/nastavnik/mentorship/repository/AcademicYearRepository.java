@@ -14,13 +14,14 @@ import java.util.Optional;
 public interface AcademicYearRepository extends JpaRepository<AcademicYear, Long> {
 
     /**
-     * Находит учебный год, в период которого входит указанная дата.
+     * Находит опубликованный учебный год, в период которого входит указанная дата.
      */
     @Query("""
-            SELECT ay
-            FROM AcademicYear ay
-            WHERE :date BETWEEN ay.startDate AND ay.endDate
-            """)
+        SELECT ay
+        FROM AcademicYear ay
+        WHERE :date BETWEEN ay.startDate AND ay.endDate
+          AND ay.published = true
+        """)
     Optional<AcademicYear> findByDate(@Param("date") LocalDate date);
 
     /**
@@ -68,4 +69,19 @@ public interface AcademicYearRepository extends JpaRepository<AcademicYear, Long
      * Включает текущие и завершённые годы, исключает запланированные.
      */
     List<AcademicYear> findAllByStartDateLessThanEqualOrderByStartDateDesc(LocalDate today);
+
+    /**
+     * Возвращает опубликованные учебные годы в порядке убывания даты начала.
+     */
+    List<AcademicYear> findAllByPublishedTrueOrderByStartDateDesc();
+
+    /**
+     * Возвращает опубликованные учебные годы, которые ещё не завершились.
+     */
+    List<AcademicYear> findAllByPublishedTrueAndEndDateGreaterThanEqualOrderByStartDateAsc(LocalDate today);
+
+    /**
+     * Возвращает опубликованные учебные годы, которые уже начались.
+     */
+    List<AcademicYear> findAllByPublishedTrueAndStartDateLessThanEqualOrderByStartDateDesc(LocalDate today);
 }
