@@ -30,35 +30,129 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class ProfileCompatibilityCalculator {
 
-    private final UserRepository userRepository;
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
     private static final BigDecimal ZERO = BigDecimal.ZERO;
     private static final BigDecimal ONE = BigDecimal.ONE;
 
     private static final Pattern NON_WORD_CHARACTERS = Pattern.compile("[^\\p{L}\\p{N}]+");
 
+    private final UserRepository userRepository;
     private final ProfileValueRepository profileValueRepository;
     private final ProfileValueOptionRepository profileValueOptionRepository;
     private final ProfileMatchingRuleRepository profileMatchingRuleRepository;
 
+    /**
+     * Одиночный расчёт совместимости.
+     */
     public ProfileCompatibilityResponse calculate(Long mentorId, Long menteeId) {
-        if (mentorId == null || menteeId == null) {
-            throw new IllegalArgumentException("Необходимо указать ID наставника и наставляемого.");
+        return calculateForMentors(List.of(mentorId), menteeId).get(mentorId);
+    }
+
+    /**
+     * Пакетный расчёт совместимости нескольких наставников
+     * с одним наставляемым.
+     */
+    public Map<Long, ProfileCompatibilityResponse> calculateForMentors(Collection<Long> mentorIds, Long menteeId) {
+        if (mentorIds == null || menteeId == null) {
+            throw new IllegalArgumentException("Необходимо указать наставников и наставляемого.");
         }
 
-        if (mentorId.equals(menteeId)) {
-            throw new IllegalArgumentException("Наставник и наставляемый должны быть разными пользователями.");
+        if (mentorIds.isEmpty()) {
+            return Map.of();
         }
 
-        User mentor = userRepository.findById(mentorId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Наставник не найден."));
-        User mentee = userRepository.findById(menteeId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Наставляемый не найден."));
+        Set<Long> uniqueMentorIds = new LinkedHashSet<>(mentorIds);
 
-        validateUsers(mentor, mentee);
+        if (uniqueMentorIds.contains(null) || uniqueMentorIds.contains(menteeId)) {
+            throw new IllegalArgumentException("Необходимо указать корректные ID наставников.");
+        }
 
-        Map<Long, ProfileValue> mentorValues = loadValues(mentorId);
-        Map<Long, ProfileValue> menteeValues = loadValues(menteeId);
+        // Загружаем всех пользователей одним запросом.
+        Set<Long> userIds = new HashSet<>(uniqueMentorIds);
+        userIds.add(menteeId);
 
+        Map<Long, User> users = userRepository.findAllById(userIds)
+                .stream()
+                .collect(Collectors.toMap(User::getId, user -> user));
+
+        User mentee = users.get(menteeId);
+
+        if (mentee == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Наставляемый не найден.");
+        }
+
+        for (Long mentorId : uniqueMentorIds) {
+            User mentor = users.get(mentorId);
+
+            if (mentor == null) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Наставник не найден.");
+            }
+
+            validateUsers(mentor, mentee);
+        }
+
+        // Загружаем значения профилей всех пользователей одним запросом.
+        List<ProfileValue> profileValues = profileValueRepository.findAllByUser_IdIn(userIds);
+
+        Map<Long, Map<Long, ProfileValue>> valuesByUserId = new HashMap<>();
+
+        for (ProfileValue value : profileValues) {
+            valuesByUserId
+                    .computeIfAbsent(value.getUser().getId(), ignored -> new HashMap<>())
+                    .put(value.getProfileField().getId(), value);
+        }
+
+        // Загружаем выбранные варианты всех значений одним запросом.
+        Set<Long> profileValueIds = profileValues.stream()
+                .map(ProfileValue::getId)
+                .collect(Collectors.toSet());
+
+        Map<Long, Set<Long>> selectedOptionsByValueId = new HashMap<>();
+
+        if (!profileValueIds.isEmpty()) {
+            List<ProfileValueOption> selectedOptions =
+                    profileValueOptionRepository.findAllByProfileValue_IdIn(profileValueIds);
+
+            for (ProfileValueOption option : selectedOptions) {
+                selectedOptionsByValueId
+                        .computeIfAbsent(option.getProfileValue().getId(), ignored -> new HashSet<>())
+                        .add(option.getProfileOption().getId());
+            }
+        }
+
+        // Правила сопоставления загружаем только один раз.
         List<ProfileMatchingRule> rules = profileMatchingRuleRepository.findAllByActiveTrue();
+
+        Map<Long, ProfileCompatibilityResponse> results = new LinkedHashMap<>();
+
+        Map<Long, ProfileValue> menteeValues = valuesByUserId.getOrDefault(menteeId, Map.of());
+
+        for (Long mentorId : uniqueMentorIds) {
+            Map<Long, ProfileValue> mentorValues = valuesByUserId.getOrDefault(mentorId, Map.of());
+
+            ProfileCompatibilityResponse response = calculateCompatibility(
+                    mentorId,
+                    menteeId,
+                    mentorValues,
+                    menteeValues,
+                    selectedOptionsByValueId,
+                    rules
+            );
+
+            results.put(mentorId, response);
+        }
+
+        return results;
+    }
+
+    private ProfileCompatibilityResponse calculateCompatibility(
+            Long mentorId,
+            Long menteeId,
+            Map<Long, ProfileValue> mentorValues,
+            Map<Long, ProfileValue> menteeValues,
+            Map<Long, Set<Long>> selectedOptionsByValueId,
+            List<ProfileMatchingRule> rules
+    ) {
         List<ProfileCompatibilityResponse.FieldCompatibility> details = new ArrayList<>();
 
         BigDecimal weightedScore = ZERO;
@@ -76,26 +170,32 @@ public class ProfileCompatibilityCalculator {
             ProfileValue mentorValue = mentorValues.get(fieldId);
             ProfileValue menteeValue = menteeValues.get(fieldId);
 
-            if (!hasComparableValue(mentorValue, rule) || !hasComparableValue(menteeValue, rule)) {
+            if (!hasComparableValue(mentorValue, rule, selectedOptionsByValueId) ||
+                    !hasComparableValue(menteeValue, rule, selectedOptionsByValueId)) {
                 skippedFieldCount++;
                 continue;
             }
 
-            BigDecimal similarity = compare(mentorValue, menteeValue, rule);
+            BigDecimal similarity = compare(mentorValue, menteeValue, rule, selectedOptionsByValueId);
+
             BigDecimal weight = rule.getWeight();
 
             weightedScore = weightedScore.add(similarity.multiply(weight));
+
             totalWeight = totalWeight.add(weight);
 
             details.add(new ProfileCompatibilityResponse.FieldCompatibility(
-                            fieldId,
-                            rule.getProfileField().getName(),
-                            rule.getComparisonType().name(),
-                            weight,
-                            similarity.multiply(HUNDRED).setScale(2, RoundingMode.HALF_UP)));
+                    fieldId,
+                    rule.getProfileField().getName(),
+                    rule.getComparisonType().name(),
+                    weight,
+                    similarity.multiply(HUNDRED).setScale(2, RoundingMode.HALF_UP)
+            ));
         }
 
-        BigDecimal percentage = totalWeight.compareTo(ZERO) == 0 ? null : weightedScore
+        BigDecimal percentage = totalWeight.compareTo(ZERO) == 0
+                ? null
+                : weightedScore
                 .divide(totalWeight, 6, RoundingMode.HALF_UP)
                 .multiply(HUNDRED)
                 .setScale(2, RoundingMode.HALF_UP);
@@ -110,54 +210,47 @@ public class ProfileCompatibilityCalculator {
         );
     }
 
-    private Map<Long, ProfileValue> loadValues(Long userId) {
-        return profileValueRepository.findAllByUser_Id(userId)
-                .stream()
-                .collect(Collectors.toMap(
-                        value -> value.getProfileField().getId(),
-                        value -> value));
-    }
-
-    private boolean hasComparableValue(ProfileValue value, ProfileMatchingRule rule) {
+    private boolean hasComparableValue(ProfileValue value, ProfileMatchingRule rule, Map<Long, Set<Long>> selectedOptionsByValueId) {
         if (value == null) {
             return false;
         }
 
         ProfileFieldType fieldType = rule.getProfileField().getFieldType();
+
         return switch (fieldType) {
             case TEXT, TEXTAREA -> value.getValueText() != null && !value.getValueText().isBlank();
             case NUMBER -> value.getValueNumber() != null;
             case BOOLEAN -> value.getValueBoolean() != null;
-            case SELECT, MULTISELECT -> !loadSelectedOptionIds(value).isEmpty();
+            case SELECT, MULTISELECT -> !getSelectedOptionIds(value, selectedOptionsByValueId).isEmpty();
             case DATE -> false;
         };
     }
 
-    private BigDecimal compare(ProfileValue mentor, ProfileValue mentee, ProfileMatchingRule rule) {
+    private BigDecimal compare(ProfileValue mentor, ProfileValue mentee, ProfileMatchingRule rule, Map<Long, Set<Long>> selectedOptionsByValueId) {
         return switch (rule.getComparisonType()) {
-            case EXACT_MATCH -> exactMatch(mentor, mentee, rule);
-            case MULTISELECT_OVERLAP -> jaccardSimilarity(loadSelectedOptionIds(mentor), loadSelectedOptionIds(mentee));
+            case EXACT_MATCH -> exactMatch(mentor, mentee, rule, selectedOptionsByValueId);
+            case MULTISELECT_OVERLAP -> jaccardSimilarity(getSelectedOptionIds(mentor, selectedOptionsByValueId), getSelectedOptionIds(mentee, selectedOptionsByValueId));
             case TEXT_WORD_OVERLAP -> jaccardSimilarity(tokenize(mentor.getValueText()), tokenize(mentee.getValueText()));
             case NUMERIC_PROXIMITY -> numericProximity(mentor.getValueNumber(), mentee.getValueNumber());
             case BOOLEAN_MATCH -> mentor.getValueBoolean().equals(mentee.getValueBoolean()) ? ONE : ZERO;
         };
     }
 
-    private BigDecimal exactMatch(ProfileValue mentor, ProfileValue mentee, ProfileMatchingRule rule) {
+    private BigDecimal exactMatch(
+            ProfileValue mentor,
+            ProfileValue mentee,
+            ProfileMatchingRule rule,
+            Map<Long, Set<Long>> selectedOptionsByValueId) {
         return switch (rule.getProfileField().getFieldType()) {
             case TEXT -> normalize(mentor.getValueText()).equals(normalize(mentee.getValueText())) ? ONE : ZERO;
-            case SELECT -> loadSelectedOptionIds(mentor).equals(loadSelectedOptionIds(mentee)) ? ONE : ZERO;
+            case SELECT -> getSelectedOptionIds(mentor, selectedOptionsByValueId)
+                            .equals(getSelectedOptionIds(mentee, selectedOptionsByValueId)) ? ONE : ZERO;
             default -> throw new IllegalStateException("EXACT_MATCH не поддерживается для поля типа " + rule.getProfileField().getFieldType());
         };
     }
 
-    private Set<Long> loadSelectedOptionIds(ProfileValue value) {
-        return profileValueOptionRepository
-                .findAllByProfileValue_Id(value.getId())
-                .stream()
-                .map(ProfileValueOption::getProfileOption)
-                .map(option -> option.getId())
-                .collect(Collectors.toSet());
+    private Set<Long> getSelectedOptionIds(ProfileValue value, Map<Long, Set<Long>> selectedOptionsByValueId) {
+        return selectedOptionsByValueId.getOrDefault(value.getId(), Set.of());
     }
 
     private Set<String> tokenize(String text) {
@@ -199,6 +292,7 @@ public class ProfileCompatibilityCalculator {
         }
 
         BigDecimal relativeDifference = first.subtract(second).abs().divide(maxMagnitude, 6, RoundingMode.HALF_UP);
+
         return ONE.subtract(relativeDifference).max(ZERO).min(ONE);
     }
 
@@ -222,6 +316,7 @@ public class ProfileCompatibilityCalculator {
 
     private boolean isRuleEligible(ProfileMatchingRule rule) {
         ProfileField field = rule.getProfileField();
+
         return rule.isActive() && field.isActive() && field.isMatchingEnabled();
     }
 }

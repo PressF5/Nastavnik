@@ -2,11 +2,11 @@ package org.donriro.nastavnik.matching.service;
 
 import lombok.RequiredArgsConstructor;
 import org.donriro.nastavnik.matching.dto.MentorMatchingResponse;
+import org.donriro.nastavnik.matching.dto.ProfileCompatibilityResponse;
 import org.donriro.nastavnik.mentorship.entity.AcademicYear;
 import org.donriro.nastavnik.mentorship.repository.AcademicYearRepository;
 import org.donriro.nastavnik.mentorship.repository.MentorshipRepository;
 import org.donriro.nastavnik.mentorship.status.MentorshipStatus;
-import org.donriro.nastavnik.profile.value.repository.ProfileValueRepository;
 import org.donriro.nastavnik.profile.value.service.ProfileValueService;
 import org.donriro.nastavnik.security.principal.CustomUserDetails;
 import org.donriro.nastavnik.user.dto.response.UserProfileResponse;
@@ -25,8 +25,8 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -34,7 +34,6 @@ import java.util.Set;
 @Transactional(readOnly = true)
 public class MentorMatchingService {
 
-    private static final String MENTOR_READINESS_FIELD_NAME = "Готовность к наставничеству";
     private static final int MIN_COMPARABLE_FIELDS = 3;
 
     private final Clock clock;
@@ -42,7 +41,6 @@ public class MentorMatchingService {
     private final UserRepository userRepository;
     private final ProfileCompatibilityCalculator compatibilityCalculator;
     private final MentorshipRepository mentorshipRepository;
-    private final ProfileValueRepository profileValueRepository;
     private final ProfileValueService profileValueService;
     private final AcademicYearRepository academicYearRepository;
 
@@ -85,13 +83,13 @@ public class MentorMatchingService {
             return List.of();
         }
 
-        Set<Long> readyMentorIds = new HashSet<>(
-                profileValueRepository.findUserIdsWithTrueBooleanValue(mentorIds, MENTOR_READINESS_FIELD_NAME));
+        // Рассчитываем совместимость всех наставников пакетно.
+        Map<Long, ProfileCompatibilityResponse> compatibilityByMentorId = compatibilityCalculator.calculateForMentors(mentorIds, mentee.getId());
 
         return mentors.stream()
-                .filter(mentor -> readyMentorIds.contains(mentor.getId()))
                 .map(mentor -> {
-                    var compatibility = compatibilityCalculator.calculate(mentor.getId(), mentee.getId());
+                    var compatibility = compatibilityByMentorId.get(mentor.getId());
+
                     return new MentorMatchingResponse(
                             mentor.getId(),
                             mentor.getFirstName(),

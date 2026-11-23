@@ -1,6 +1,7 @@
 package org.donriro.nastavnik.profile.value.repository;
 
 import org.donriro.nastavnik.profile.value.entity.ProfileValue;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -30,5 +31,6 @@ public interface ProfileValueRepository extends JpaRepository<ProfileValue, Long
         """)
     Set<Long> findUserIdsWithTrueBooleanValue(@Param("userIds") Set<Long> userIds, @Param("fieldName") String fieldName);
 
+    @EntityGraph(attributePaths = {"user", "profileField"})
     List<ProfileValue> findAllByUser_IdIn(Collection<Long> userIds);
 }

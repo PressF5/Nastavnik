@@ -2,6 +2,7 @@ package org.donriro.nastavnik.profile.value.repository;
 
 import org.donriro.nastavnik.profile.value.entity.ProfileValueOption;
 import org.donriro.nastavnik.profile.value.entity.ProfileValueOptionId;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -12,5 +13,6 @@ import java.util.List;
 public interface ProfileValueOptionRepository extends JpaRepository<ProfileValueOption, ProfileValueOptionId> {
     List<ProfileValueOption> findAllByProfileValue_Id(Long profileValueId);
     void deleteAllByProfileValue_Id(Long profileValueId);
+    @EntityGraph(attributePaths = "profileOption")
     List<ProfileValueOption> findAllByProfileValue_IdIn(Collection<Long> profileValueIds);
 }
