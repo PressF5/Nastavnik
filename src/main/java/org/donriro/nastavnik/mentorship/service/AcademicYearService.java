@@ -201,8 +201,10 @@ public class AcademicYearService {
 
         AcademicYear academicYear = findAcademicYear(id);
 
-        if (getStatus(academicYear) != AcademicYearStatus.PLANNED) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Можно изменять только запланированный учебный год.");
+        // Черновик можно редактировать независимо от календарного статуса.
+        // Опубликованный учебный год можно изменять только до начала периода.
+        if (academicYear.isPublished() && getStatus(academicYear) != AcademicYearStatus.PLANNED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Опубликованный учебный год можно изменять только до начала периода.");
         }
 
         String name = request.name().trim();
