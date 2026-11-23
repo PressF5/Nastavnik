@@ -84,4 +84,13 @@ public class AcademicYearController {
         academicYearService.delete(id);
         return ResponseEntity.noContent().build();
     }
+
+    /**
+     * Публикует учебный год.
+     */
+    @PutMapping("/api/admin/academic-years/{id}/publish")
+    @PreAuthorize("hasRole('REGION_ADMIN')")
+    public ResponseEntity<AcademicYearResponse> publish(@PathVariable Long id) {
+        return ResponseEntity.ok(academicYearService.publish(id));
+    }
 }

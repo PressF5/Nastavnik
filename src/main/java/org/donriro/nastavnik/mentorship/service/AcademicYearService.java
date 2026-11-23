@@ -25,6 +25,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -67,11 +68,50 @@ public class AcademicYearService {
 
         AcademicYear saved = academicYearRepository.save(academicYear);
 
-        // Получаем всех действующих наставников.
-        List<User> mentors = userRepository.findAllByRole_CodeAndAccountStatusAndBlockedFalse(RoleCode.MENTOR, AccountStatus.ACCEPTED);
+        return toResponse(saved);
+    }
 
-        // Создаём отдельную запись участия для каждого наставника.
+    /**
+     * Публикует учебный год и создаёт записи участия
+     * для всех действующих наставников.
+     */
+    @Transactional
+    public AcademicYearResponse publish(Long id) {
+        User currentUser = getCurrentUser();
+
+        requireRegionAdmin(currentUser);
+
+        AcademicYear academicYear = findAcademicYear(id);
+
+        // Повторная публикация не должна создавать дубли.
+        if (academicYear.isPublished()) {
+            return toResponse(academicYear);
+        }
+
+        academicYear.setPublished(true);
+
+        AcademicYear saved = academicYearRepository.save(academicYear);
+
+        // Получаем всех подтверждённых и незаблокированных наставников.
+        List<User> mentors = userRepository.findAllByRole_CodeAndAccountStatusAndBlockedFalse(
+                RoleCode.MENTOR,
+                AccountStatus.ACCEPTED
+        );
+
+        if (mentors.isEmpty()) {
+            return toResponse(saved);
+        }
+
+        Set<Long> mentorIds = mentors.stream()
+                .map(User::getId)
+                .collect(java.util.stream.Collectors.toSet());
+
+        // Одним запросом проверяем, у кого уже есть запись участия.
+        Set<Long> existingMentorIds =
+                mentorParticipationRepository.findExistingMentorIds(saved.getId(), mentorIds);
+
         List<MentorParticipation> participations = mentors.stream()
+                .filter(mentor -> !existingMentorIds.contains(mentor.getId()))
                 .map(mentor -> {
                     MentorParticipation participation = new MentorParticipation();
                     participation.setMentor(mentor);
@@ -81,8 +121,9 @@ public class AcademicYearService {
                 })
                 .toList();
 
-        // Сохраняем записи участия вместе с созданием учебного года.
-        mentorParticipationRepository.saveAll(participations);
+        if (!participations.isEmpty()) {
+            mentorParticipationRepository.saveAll(participations);
+        }
 
         return toResponse(saved);
     }
@@ -276,6 +317,7 @@ public class AcademicYearService {
         return new AcademicYearResponse(
                 academicYear.getId(),
                 academicYear.getName(),
+                academicYear.isPublished(),
                 academicYear.getStartDate(),
                 academicYear.getEndDate(),
                 getStatus(academicYear)
