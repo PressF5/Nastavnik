@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Repository
 public interface MentorshipRepository extends JpaRepository<Mentorship, Long> {
@@ -152,4 +153,14 @@ public interface MentorshipRepository extends JpaRepository<Mentorship, Long> {
      * Учитываются все статусы, в том числе PENDING и REJECTED.
      */
     boolean existsByAcademicYear_Id(Long academicYearId);
+
+    /**
+     * Возвращает ID учебных годов, к которым привязаны наставнические пары.
+     */
+    @Query("""
+    select distinct mentorship.academicYear.id
+    from Mentorship mentorship
+    where mentorship.academicYear.id in :academicYearIds
+    """)
+    Set<Long> findAcademicYearIdsWithMentorships(@Param("academicYearIds") Set<Long> academicYearIds);
 }

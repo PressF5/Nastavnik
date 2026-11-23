@@ -158,4 +158,15 @@ public interface MentorParticipationRepository extends JpaRepository<MentorParti
             @Param("search") String search,
             Pageable pageable
     );
+
+    /**
+     * Возвращает ID учебных годов, в которых хотя бы один наставник подтвердил участие.
+     */
+    @Query("""
+    select distinct participation.academicYear.id
+    from MentorParticipation participation
+    where participation.academicYear.id in :academicYearIds
+      and participation.participated = true
+    """)
+    Set<Long> findAcademicYearIdsWithConfirmedParticipation(@Param("academicYearIds") Set<Long> academicYearIds);
 }

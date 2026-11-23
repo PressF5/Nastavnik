@@ -23,6 +23,8 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -102,9 +104,29 @@ public class AcademicYearService {
 
         requireRegionAdmin(currentUser);
 
-        return academicYearRepository.findAllByOrderByStartDateDesc()
-                .stream()
-                .map(this::toResponse)
+        List<AcademicYear> academicYears =
+                academicYearRepository.findAllByOrderByStartDateDesc();
+
+        if (academicYears.isEmpty()) {
+            return List.of();
+        }
+
+        Set<Long> academicYearIds = academicYears.stream()
+                .map(AcademicYear::getId)
+                .collect(Collectors.toSet());
+
+        Set<Long> yearsWithMentorships =
+                mentorshipRepository.findAcademicYearIdsWithMentorships(academicYearIds);
+
+        Set<Long> yearsWithConfirmedParticipation =
+                mentorParticipationRepository
+                        .findAcademicYearIdsWithConfirmedParticipation(academicYearIds);
+
+        return academicYears.stream()
+                .map(year -> toResponse(
+                        year,
+                        canEdit(year, yearsWithMentorships, yearsWithConfirmedParticipation)
+                ))
                 .toList();
     }
 
@@ -203,8 +225,8 @@ public class AcademicYearService {
 
         // Черновик можно редактировать независимо от календарного статуса.
         // Опубликованный учебный год можно изменять только до начала периода.
-        if (academicYear.isPublished() && getStatus(academicYear) != AcademicYearStatus.PLANNED) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Опубликованный учебный год можно изменять только до начала периода.");
+        if (!canEdit(academicYear)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Нельзя изменить учебный год: к нему уже привязаны наставнические пары или наставник подтвердил участие.");
         }
 
         String name = request.name().trim();
@@ -263,6 +285,32 @@ public class AcademicYearService {
     }
 
     /**
+     * Проверяет, разрешено ли редактирование учебного года.
+     */
+    private boolean canEdit(AcademicYear academicYear, Set<Long> yearsWithMentorships, Set<Long> yearsWithConfirmedParticipation) {
+        if (!academicYear.isPublished()) {
+            return true;
+        }
+
+        Long id = academicYear.getId();
+
+        return !yearsWithMentorships.contains(id) && !yearsWithConfirmedParticipation.contains(id);
+    }
+
+    /**
+     * Проверяет возможность редактирования одного учебного года.
+     */
+    private boolean canEdit(AcademicYear academicYear) {
+        if (!academicYear.isPublished()) {
+            return true;
+        }
+
+        Long id = academicYear.getId();
+
+        return !mentorshipRepository.existsByAcademicYear_Id(id) && !mentorParticipationRepository.existsByAcademicYear_IdAndParticipatedTrue(id);
+    }
+
+    /**
      * Определяет статус учебного года по календарной дате.
      */
     private AcademicYearStatus getStatus(AcademicYear academicYear) {
@@ -280,13 +328,18 @@ public class AcademicYearService {
     }
 
     private AcademicYearResponse toResponse(AcademicYear academicYear) {
+        return toResponse(academicYear, canEdit(academicYear));
+    }
+
+    private AcademicYearResponse toResponse(AcademicYear academicYear, boolean canEdit) {
         return new AcademicYearResponse(
                 academicYear.getId(),
                 academicYear.getName(),
                 academicYear.isPublished(),
                 academicYear.getStartDate(),
                 academicYear.getEndDate(),
-                getStatus(academicYear)
+                getStatus(academicYear),
+                canEdit
         );
     }
 

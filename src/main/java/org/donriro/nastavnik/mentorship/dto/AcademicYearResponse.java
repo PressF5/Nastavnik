@@ -8,12 +8,12 @@ import java.time.LocalDate;
  * Информация об учебном годе.
  */
 public record AcademicYearResponse(
-
         Long id,
         String name,
         boolean published,
         LocalDate startDate,
         LocalDate endDate,
-        AcademicYearStatus status
+        AcademicYearStatus status,
+        boolean canEdit
 ) {
 }
