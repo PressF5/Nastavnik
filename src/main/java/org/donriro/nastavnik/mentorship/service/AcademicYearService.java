@@ -8,6 +8,7 @@ import org.donriro.nastavnik.mentorship.entity.AcademicYear;
 import org.donriro.nastavnik.mentorship.entity.MentorParticipation;
 import org.donriro.nastavnik.mentorship.repository.AcademicYearRepository;
 import org.donriro.nastavnik.mentorship.repository.MentorParticipationRepository;
+import org.donriro.nastavnik.mentorship.repository.MentorshipRepository;
 import org.donriro.nastavnik.mentorship.status.AcademicYearStatus;
 import org.donriro.nastavnik.security.principal.CustomUserDetails;
 import org.donriro.nastavnik.user.entity.User;
@@ -35,6 +36,7 @@ public class AcademicYearService {
     private final AcademicYearRepository academicYearRepository;
     private final MentorParticipationRepository mentorParticipationRepository;
     private final UserRepository userRepository;
+    private final MentorshipRepository mentorshipRepository;
 
     /**
      * Создаёт учебный год.
@@ -209,6 +211,48 @@ public class AcademicYearService {
         AcademicYear saved = academicYearRepository.save(academicYear);
 
         return toResponse(saved);
+    }
+
+    /**
+     * Удаляет запланированный учебный год, если он ещё не связан
+     * с наставническими парами и подтверждённым участием наставников.
+     */
+    @Transactional
+    public void delete(Long id) {
+        User currentUser = getCurrentUser();
+
+        requireRegionAdmin(currentUser);
+
+        AcademicYear academicYear = findAcademicYear(id);
+
+        if (getStatus(academicYear) != AcademicYearStatus.PLANNED) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Удалять можно только запланированный учебный год."
+            );
+        }
+
+        // Проверяем наличие наставнических пар независимо от их статуса.
+        if (mentorshipRepository.existsByAcademicYear_Id(id)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Нельзя удалить учебный год, к которому уже привязаны наставнические пары."
+            );
+        }
+
+        // Проверяем, подтвердил ли хотя бы один наставник участие.
+        if (mentorParticipationRepository.existsByAcademicYear_IdAndParticipatedTrue(id)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Нельзя удалить учебный год: хотя бы один наставник уже подтвердил участие."
+            );
+        }
+
+        // Удаляем автоматически созданные неподтверждённые записи участия.
+        mentorParticipationRepository.deleteAllByAcademicYearId(id);
+
+        // Удаляем сам учебный год.
+        academicYearRepository.delete(academicYear);
     }
 
     /**

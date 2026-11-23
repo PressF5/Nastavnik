@@ -74,4 +74,14 @@ public class AcademicYearController {
     public ResponseEntity<AcademicYearResponse> update(@PathVariable Long id, @Valid @RequestBody UpdateAcademicYearRequest request) {
         return ResponseEntity.ok(academicYearService.update(id, request));
     }
+
+    /**
+     * Удаляет запланированный учебный год, если он не связан с другими данными.
+     */
+    @DeleteMapping("/api/admin/academic-years/{id}")
+    @PreAuthorize("hasRole('REGION_ADMIN')")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        academicYearService.delete(id);
+        return ResponseEntity.noContent().build();
+    }
 }

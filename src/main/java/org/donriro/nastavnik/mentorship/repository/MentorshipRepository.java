@@ -146,4 +146,10 @@ public interface MentorshipRepository extends JpaRepository<Mentorship, Long> {
             Long academicYearId,
             List<MentorshipStatus> statuses
     );
+
+    /**
+     * Проверяет, существуют ли наставнические пары, связанные с учебным годом.
+     * Учитываются все статусы, в том числе PENDING и REJECTED.
+     */
+    boolean existsByAcademicYear_Id(Long academicYearId);
 }

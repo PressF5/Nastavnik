@@ -11,6 +11,7 @@ public record AcademicYearResponse(
 
         Long id,
         String name,
+        boolean published,
         LocalDate startDate,
         LocalDate endDate,
         AcademicYearStatus status

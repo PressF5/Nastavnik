@@ -22,6 +22,9 @@ public class AcademicYear extends BaseEntity {
     @Column(nullable = false, length = 20, unique = true)
     private String name;
 
+    @Column(nullable = false)
+    private boolean published = false;
+
     @Column(name = "start_date", nullable = false)
     private LocalDate startDate;
 
