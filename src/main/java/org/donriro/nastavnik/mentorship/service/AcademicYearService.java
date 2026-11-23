@@ -251,7 +251,7 @@ public class AcademicYearService {
     }
 
     /**
-     * Удаляет неопубликованный учебный год, если он ещё не связан
+     * Удаляет учебный год, если он ещё не связан
      * с наставническими парами и подтверждённым участием наставников.
      */
     @Transactional
@@ -261,11 +261,6 @@ public class AcademicYearService {
         requireRegionAdmin(currentUser);
 
         AcademicYear academicYear = findAcademicYear(id);
-
-        // Удалять можно только неопубликованные учебные годы.
-        if (academicYear.isPublished()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Нельзя удалить опубликованный учебный год.");
-        }
 
         // Проверяем наличие наставнических пар независимо от их статуса.
         if (mentorshipRepository.existsByAcademicYear_Id(id)) {
@@ -286,12 +281,10 @@ public class AcademicYearService {
 
     /**
      * Проверяет, разрешено ли редактирование учебного года.
+     * Публикация не ограничивает редактирование, если год ещё не связан
+     * с наставническими парами и никто не подтвердил участие.
      */
     private boolean canEdit(AcademicYear academicYear, Set<Long> yearsWithMentorships, Set<Long> yearsWithConfirmedParticipation) {
-        if (!academicYear.isPublished()) {
-            return true;
-        }
-
         Long id = academicYear.getId();
 
         return !yearsWithMentorships.contains(id) && !yearsWithConfirmedParticipation.contains(id);
@@ -301,12 +294,7 @@ public class AcademicYearService {
      * Проверяет возможность редактирования одного учебного года.
      */
     private boolean canEdit(AcademicYear academicYear) {
-        if (!academicYear.isPublished()) {
-            return true;
-        }
-
         Long id = academicYear.getId();
-
         return !mentorshipRepository.existsByAcademicYear_Id(id) && !mentorParticipationRepository.existsByAcademicYear_IdAndParticipatedTrue(id);
     }
 
