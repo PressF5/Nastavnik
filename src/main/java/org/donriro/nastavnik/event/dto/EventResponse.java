@@ -2,6 +2,7 @@ package org.donriro.nastavnik.event.dto;
 
 import org.donriro.nastavnik.event.status.EventFormat;
 import org.donriro.nastavnik.event.status.EventLevel;
+import org.donriro.nastavnik.event.status.EventStatus;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -14,8 +15,10 @@ public record EventResponse(
         String description,
         EventLevel level,
         EventFormat format,
+        EventStatus status,
         LocalDateTime startAt,
         LocalDateTime endAt,
+        Instant nextStatusChangeAt,
         String location,
         String organizerPersonName,
         String organizerOrganizationName,

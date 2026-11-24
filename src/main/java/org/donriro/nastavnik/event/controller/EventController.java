@@ -6,7 +6,6 @@ import org.donriro.nastavnik.event.dto.ChangeEventStatusRequest;
 import org.donriro.nastavnik.event.dto.CreateEventRequest;
 import org.donriro.nastavnik.event.dto.EventResponse;
 import org.donriro.nastavnik.event.dto.UpdateEventRequest;
-import org.donriro.nastavnik.event.entity.Event;
 import org.donriro.nastavnik.event.service.EventService;
 import org.donriro.nastavnik.event.status.EventLevel;
 import org.donriro.nastavnik.security.principal.CustomUserDetails;
@@ -28,8 +27,8 @@ public class EventController {
      */
     @PostMapping
     public ResponseEntity<EventResponse> create(@AuthenticationPrincipal CustomUserDetails principal, @Valid @RequestBody CreateEventRequest request) {
-        Event event = eventService.create(principal.getUser().getId(), request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(event));
+        EventResponse response = eventService.create(principal.getUser().getId(), request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     /**
@@ -43,9 +42,15 @@ public class EventController {
             @RequestParam(required = false) Boolean active,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        Page<EventResponse> response = eventService
-                .getPage(principal.getUser().getId(), search, level, active, page, size)
-                .map(this::toResponse);
+        Page<EventResponse> response = eventService.getPage(
+                principal.getUser().getId(),
+                search,
+                level,
+                active,
+                page,
+                size
+        );
+
         return ResponseEntity.ok(response);
     }
 
@@ -53,43 +58,17 @@ public class EventController {
      * Обновляет мероприятие.
      */
     @PutMapping("/{id}")
-    public ResponseEntity<EventResponse> update(
-            @AuthenticationPrincipal CustomUserDetails principal,
-            @PathVariable Long id,
-            @Valid @RequestBody UpdateEventRequest request) {
-        Event event = eventService.update(principal.getUser().getId(), id, request);
-        return ResponseEntity.ok(toResponse(event));
+    public ResponseEntity<EventResponse> update(@AuthenticationPrincipal CustomUserDetails principal, @PathVariable Long id, @Valid @RequestBody UpdateEventRequest request) {
+        EventResponse response = eventService.update(principal.getUser().getId(), id, request);
+        return ResponseEntity.ok(response);
     }
 
     /**
      * Изменяет активность мероприятия.
      */
     @PatchMapping("/{id}/status")
-    public ResponseEntity<EventResponse> changeStatus(
-            @AuthenticationPrincipal CustomUserDetails principal,
-            @PathVariable Long id,
-            @Valid @RequestBody ChangeEventStatusRequest request) {
-
-        Event event = eventService.changeStatus(principal.getUser().getId(), id, request.active());
-        return ResponseEntity.ok(toResponse(event));
-    }
-
-    private EventResponse toResponse(Event event) {
-        return new EventResponse(
-                event.getId(),
-                event.getName(),
-                event.getDescription(),
-                event.getLevel(),
-                event.getStartDate(),
-                event.getEndDate(),
-                event.getLocation(),
-                event.getOrganizer(),
-                event.getUrl(),
-                event.isActive(),
-                event.getRegion().getId(),
-                event.getMsu() != null ? event.getMsu().getId() : null,
-                event.getCreatedAt(),
-                event.getUpdatedAt()
-        );
+    public ResponseEntity<EventResponse> changeStatus(@AuthenticationPrincipal CustomUserDetails principal, @PathVariable Long id, @Valid @RequestBody ChangeEventStatusRequest request) {
+        EventResponse response = eventService.changeStatus(principal.getUser().getId(), id, request.active());
+        return ResponseEntity.ok(response);
     }
 }
