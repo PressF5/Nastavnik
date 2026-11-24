@@ -10,6 +10,7 @@ import org.donriro.nastavnik.event.service.EventService;
 import org.donriro.nastavnik.event.status.EventLevel;
 import org.donriro.nastavnik.security.principal.CustomUserDetails;
 import org.springframework.data.domain.Page;
+import org.springframework.data.web.PagedModel;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -35,13 +36,14 @@ public class EventController {
      * Возвращает страницу мероприятий с учётом полномочий администратора.
      */
     @GetMapping
-    public ResponseEntity<Page<EventResponse>> getAll(
+    public ResponseEntity<PagedModel<EventResponse>> getAll(
             @AuthenticationPrincipal CustomUserDetails principal,
             @RequestParam(defaultValue = "") String search,
             @RequestParam(required = false) EventLevel level,
             @RequestParam(required = false) Boolean active,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
+
         Page<EventResponse> response = eventService.getPage(
                 principal.getUser().getId(),
                 search,
@@ -51,7 +53,7 @@ public class EventController {
                 size
         );
 
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(new PagedModel<>(response));
     }
 
     /**
