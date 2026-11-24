@@ -92,3 +92,6 @@ databaseChangeLog:
 
   - include:
       file: db/changelog/030-add-academic-year-published.sql
+
+  - include:
+      file: db/changelog/031-create-event.sql
