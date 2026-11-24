@@ -160,10 +160,16 @@ public class EventService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Нет доступа к этому мероприятию.");
         }
 
-        // Уровень мероприятия после создания не изменяется.
-        if (request.level() != event.getLevel()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Нельзя изменить уровень уже созданного мероприятия."
-            );
+        // Проверяем допустимость изменения уровня мероприятия.
+        RoleCode role = actor.getRole().getCode();
+        EventLevel requestedLevel = request.level();
+
+        if (role == RoleCode.MSU_ADMIN && requestedLevel != event.getLevel()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Администратор МСУ не может изменять уровень мероприятия.");
+        }
+
+        if (role == RoleCode.REGION_ADMIN && requestedLevel != EventLevel.FEDERAL && requestedLevel != EventLevel.REGIONAL) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Региональный администратор может устанавливать только федеральный или региональный уровень.");
         }
 
         if (request.endDate() != null && request.endDate().isBefore(request.startDate())) {
@@ -171,6 +177,7 @@ public class EventService {
         }
 
         event.setName(request.name().trim());
+        event.setLevel(requestedLevel);
         event.setDescription(request.description());
         event.setStartDate(request.startDate());
         event.setEndDate(request.endDate());
