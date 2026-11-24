@@ -3,6 +3,7 @@ package org.donriro.nastavnik.event.service;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.donriro.nastavnik.event.dto.CreateEventRequest;
+import org.donriro.nastavnik.event.dto.UpdateEventRequest;
 import org.donriro.nastavnik.event.entity.Event;
 import org.donriro.nastavnik.event.repository.EventRepository;
 import org.donriro.nastavnik.event.status.EventLevel;
@@ -132,6 +133,52 @@ public class EventService {
         };
 
         return eventRepository.findAll(specification, PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "startDate")));
+    }
+
+    /**
+     * Обновляет мероприятие в пределах полномочий текущего администратора.
+     */
+    @Transactional
+    @PreAuthorize("@roleAccess.isRegionAdmin(authentication) or @roleAccess.isMsuAdmin(authentication)")
+    public Event update(Long actorId, Long eventId, UpdateEventRequest request) {
+        User actor = getUser(actorId);
+        checkAdministrator(actor);
+
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Мероприятие не найдено."));
+
+        // Проверяем, что мероприятие относится к доступной администратору области.
+        if (!event.getRegion().getId().equals(actor.getRegion().getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Нет доступа к этому мероприятию.");
+        }
+
+        // Администратор МСУ может редактировать только муниципальные мероприятия своего МСУ.
+        if (actor.getRole().getCode() == RoleCode.MSU_ADMIN
+                && (event.getLevel() != EventLevel.MUNICIPAL
+                || event.getMsu() == null
+                || !event.getMsu().getId().equals(actor.getMsu().getId()))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Нет доступа к этому мероприятию.");
+        }
+
+        // Уровень мероприятия после создания не изменяется.
+        if (request.level() != event.getLevel()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Нельзя изменить уровень уже созданного мероприятия."
+            );
+        }
+
+        if (request.endDate() != null && request.endDate().isBefore(request.startDate())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Дата окончания не может быть раньше даты начала мероприятия.");
+        }
+
+        event.setName(request.name().trim());
+        event.setDescription(request.description());
+        event.setStartDate(request.startDate());
+        event.setEndDate(request.endDate());
+        event.setLocation(request.location());
+        event.setOrganizer(request.organizer());
+        event.setUrl(request.url());
+
+        return eventRepository.save(event);
     }
 
     private User getUser(Long id) {
