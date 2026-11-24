@@ -73,4 +73,13 @@ public class EventController {
         EventResponse response = eventService.changeStatus(principal.getUser().getId(), id, request.active());
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * Удаляет мероприятие.
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@AuthenticationPrincipal CustomUserDetails principal, @PathVariable Long id) {
+        eventService.delete(principal.getUser().getId(), id);
+        return ResponseEntity.noContent().build();
+    }
 }

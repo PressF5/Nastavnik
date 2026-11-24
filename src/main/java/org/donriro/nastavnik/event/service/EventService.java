@@ -202,6 +202,23 @@ public class EventService {
     }
 
     /**
+     * Удаляет мероприятие в пределах полномочий текущего администратора.
+     */
+    @Transactional
+    @PreAuthorize("@roleAccess.isRegionAdmin(authentication) or @roleAccess.isMsuAdmin(authentication)")
+    public void delete(Long actorId, Long eventId) {
+        User actor = getUser(actorId);
+        checkAdministrator(actor);
+
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Мероприятие не найдено."));
+
+        checkEventAccess(actor, event);
+
+        eventRepository.delete(event);
+    }
+
+    /**
      * Проверяет допустимый уровень мероприятия для роли администратора.
      */
     private void checkEventLevel(RoleCode role, EventLevel level) {
