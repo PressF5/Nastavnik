@@ -178,6 +178,11 @@ public class EventService {
 
         event.setName(request.name().trim());
         event.setLevel(requestedLevel);
+        // При переводе муниципального мероприятия на региональный
+        // или федеральный уровень отвязываем его от МСУ.
+        if (role == RoleCode.REGION_ADMIN) {
+            event.setMsu(null);
+        }
         event.setDescription(request.description());
         event.setStartDate(request.startDate());
         event.setEndDate(request.endDate());
