@@ -2,6 +2,7 @@ package org.donriro.nastavnik.event.service;
 
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
+import org.donriro.nastavnik.event.dto.CreateEventRequest;
 import org.donriro.nastavnik.event.entity.Event;
 import org.donriro.nastavnik.event.repository.EventRepository;
 import org.donriro.nastavnik.event.status.EventLevel;
@@ -32,8 +33,60 @@ public class EventService {
     private final UserRepository userRepository;
 
     /**
+     * Создаёт мероприятие в пределах полномочий текущего администратора.
+     */
+    @Transactional
+    @PreAuthorize("@roleAccess.isRegionAdmin(authentication) or @roleAccess.isMsuAdmin(authentication)")
+    public Event create(Long actorId, CreateEventRequest request) {
+        User actor = getUser(actorId);
+        checkAdministrator(actor);
+
+        RoleCode role = actor.getRole().getCode();
+        EventLevel level = request.level();
+
+        if (level == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Уровень мероприятия обязателен.");
+        }
+
+        // Проверяем, имеет ли администратор право создавать мероприятия этого уровня.
+        if (role == RoleCode.REGION_ADMIN && level != EventLevel.FEDERAL && level != EventLevel.REGIONAL) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Региональный администратор может создавать только федеральные и региональные мероприятия.");
+        }
+
+        if (role == RoleCode.MSU_ADMIN && level != EventLevel.MUNICIPAL) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Администратор МСУ может создавать только муниципальные мероприятия.");
+        }
+
+        if (request.endDate() != null && request.endDate().isBefore(request.startDate())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Дата окончания не может быть раньше даты начала мероприятия.");
+        }
+
+        Event event = new Event();
+        event.setName(request.name().trim());
+        event.setDescription(request.description());
+        event.setLevel(level);
+        event.setStartDate(request.startDate());
+        event.setEndDate(request.endDate());
+        event.setLocation(request.location());
+        event.setOrganizer(request.organizer());
+        event.setUrl(request.url());
+
+        // Регион определяется по текущему администратору.
+        event.setRegion(actor.getRegion());
+
+        // Муниципальное мероприятие автоматически привязывается к МСУ администратора.
+        if (level == EventLevel.MUNICIPAL) {
+            event.setMsu(actor.getMsu());
+        }
+
+        event.setCreatedBy(actor);
+        event.setActive(true);
+
+        return eventRepository.save(event);
+    }
+
+    /**
      * Получает страницу мероприятий в пределах доступной администратору области.
-     *
      * REGION_ADMIN видит все мероприятия своего региона.
      * MSU_ADMIN видит федеральные и региональные мероприятия своего региона,
      * а также муниципальные мероприятия своего МСУ.
