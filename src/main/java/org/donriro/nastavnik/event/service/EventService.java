@@ -193,6 +193,36 @@ public class EventService {
         return eventRepository.save(event);
     }
 
+    /**
+     * Изменяет активность мероприятия в пределах полномочий администратора.
+     */
+    @Transactional
+    @PreAuthorize("@roleAccess.isRegionAdmin(authentication) or @roleAccess.isMsuAdmin(authentication)")
+    public Event changeStatus(Long actorId, Long eventId, boolean active) {
+        User actor = getUser(actorId);
+        checkAdministrator(actor);
+
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Мероприятие не найдено."));
+
+        // Проверяем, что мероприятие относится к региону администратора.
+        if (!event.getRegion().getId().equals(actor.getRegion().getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Нет доступа к этому мероприятию.");
+        }
+
+        // Администратор МСУ может менять активность только своих муниципальных мероприятий.
+        if (actor.getRole().getCode() == RoleCode.MSU_ADMIN
+                && (event.getLevel() != EventLevel.MUNICIPAL
+                || event.getMsu() == null
+                || !event.getMsu().getId().equals(actor.getMsu().getId()))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Нет доступа к этому мероприятию.");
+        }
+
+        event.setActive(active);
+
+        return eventRepository.save(event);
+    }
+
     private User getUser(Long id) {
         return userRepository.findByIdWithOrganizationContext(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Пользователь не найден."));

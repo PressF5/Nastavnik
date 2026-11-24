@@ -2,6 +2,7 @@ package org.donriro.nastavnik.event.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.donriro.nastavnik.event.dto.ChangeEventStatusRequest;
 import org.donriro.nastavnik.event.dto.CreateEventRequest;
 import org.donriro.nastavnik.event.dto.EventResponse;
 import org.donriro.nastavnik.event.dto.UpdateEventRequest;
@@ -57,6 +58,19 @@ public class EventController {
             @PathVariable Long id,
             @Valid @RequestBody UpdateEventRequest request) {
         Event event = eventService.update(principal.getUser().getId(), id, request);
+        return ResponseEntity.ok(toResponse(event));
+    }
+
+    /**
+     * Изменяет активность мероприятия.
+     */
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<EventResponse> changeStatus(
+            @AuthenticationPrincipal CustomUserDetails principal,
+            @PathVariable Long id,
+            @Valid @RequestBody ChangeEventStatusRequest request) {
+
+        Event event = eventService.changeStatus(principal.getUser().getId(), id, request.active());
         return ResponseEntity.ok(toResponse(event));
     }
 
