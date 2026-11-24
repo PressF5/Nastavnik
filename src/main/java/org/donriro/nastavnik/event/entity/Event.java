@@ -5,15 +5,17 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.donriro.nastavnik.config.common.persistence.BaseEntity;
+import org.donriro.nastavnik.event.status.EventFormat;
 import org.donriro.nastavnik.event.status.EventLevel;
 import org.donriro.nastavnik.organization.msu.entity.Msu;
 import org.donriro.nastavnik.organization.region.entity.Region;
 import org.donriro.nastavnik.user.entity.User;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
-@Table(name = "event")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -33,17 +35,24 @@ public class Event extends BaseEntity {
     @Column(name = "level", nullable = false, length = 20)
     private EventLevel level;
 
-    @Column(name = "start_date", nullable = false)
-    private LocalDate startDate;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "format", nullable = false, length = 20)
+    private EventFormat format;
 
-    @Column(name = "end_date")
-    private LocalDate endDate;
+    @Column(name = "start_at", nullable = false)
+    private LocalDateTime startAt;
+
+    @Column(name = "end_at", nullable = false)
+    private LocalDateTime endAt;
 
     @Column(name = "location", length = 300)
     private String location;
 
-    @Column(name = "organizer", length = 200)
-    private String organizer;
+    @Column(name = "organizer_person_name", length = 300)
+    private String organizerPersonName;
+
+    @Column(name = "organizer_organization_name", length = 500)
+    private String organizerOrganizationName;
 
     @Column(name = "url", length = 1000)
     private String url;
@@ -62,4 +71,12 @@ public class Event extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "created_by", nullable = false)
     private User createdBy;
+
+    @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder ASC, id ASC")
+    private List<EventSpeaker> speakers = new ArrayList<>();
+
+    @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder ASC, id ASC")
+    private List<EventMaterialLink> materialLinks = new ArrayList<>();
 }
