@@ -1,7 +1,6 @@
 package org.donriro.nastavnik.mentorship.service;
 
 import lombok.RequiredArgsConstructor;
-import org.donriro.nastavnik.matching.service.ProfileCompatibilityCalculator;
 import org.donriro.nastavnik.mentorship.dto.*;
 import org.donriro.nastavnik.mentorship.entity.AcademicYear;
 import org.donriro.nastavnik.mentorship.entity.Mentorship;
@@ -28,7 +27,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -48,7 +46,6 @@ public class MentorshipService {
     private final AcademicYearRepository academicYearRepository;
     private final MentorshipAuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
-    private final ProfileCompatibilityCalculator compatibilityCalculator;
     private final ProfileValueService profileValueService;
     private final MentorParticipationRepository mentorParticipationRepository;
 
@@ -696,6 +693,15 @@ public class MentorshipService {
 
         AcademicYear academicYear = academicYearRepository.findByDate(today)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "На текущую дату не найден действующий учебный год."));
+
+        // Проверяем, что наставляемому ещё не назначен наставник
+        // и для него нет ожидающей заявки в текущем учебном году.
+        boolean hasActiveOrPendingRequest =
+                mentorshipRepository.existsByMentee_IdAndAcademicYear_IdAndStatusIn(mentee.getId(), academicYear.getId(), List.of(MentorshipStatus.PENDING, MentorshipStatus.ACCEPTED));
+
+        if (hasActiveOrPendingRequest) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Для наставляемого уже создана заявка или назначен наставник в текущем учебном году.");
+        }
 
         return userRepository.findEligibleMentors(
                         RoleCode.MENTOR,
