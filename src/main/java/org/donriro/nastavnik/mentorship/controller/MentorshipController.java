@@ -126,4 +126,13 @@ public class MentorshipController {
     public ResponseEntity<MenteeProfileResponse> getPendingMenteeProfile(@PathVariable("id") Long mentorshipId) {
         return ResponseEntity.ok(mentorshipService.getPendingMenteeProfile(mentorshipId));
     }
+
+    /**
+     * Список наставников для ручного назначения.
+     */
+    @GetMapping("/api/admin/mentees/{menteeId}/mentors/manual")
+    @PreAuthorize("hasRole('OO_ADMIN')")
+    public ResponseEntity<List<AvailableMentorResponse>> getAvailableMentors(@PathVariable Long menteeId) {
+        return ResponseEntity.ok(mentorshipService.getAvailableMentors(menteeId));
+    }
 }

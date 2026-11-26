@@ -114,15 +114,6 @@ public class MentorshipService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Наставник уже имеет трёх действующих наставляемых.");
         }
 
-        // Предварительно проверяем совместимость наставника
-        // и наставляемого. Допускается только результат строго выше 50%.
-        var compatibility = compatibilityCalculator.calculate(mentor.getId(), mentee.getId());
-        BigDecimal compatibilityPercentage = compatibility.compatibilityPercentage();
-
-        if (compatibilityPercentage == null || compatibilityPercentage.compareTo(BigDecimal.valueOf(50)) <= 0) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Совместимость наставника и наставляемого должна быть выше 50%.");
-        }
-
         List<MentorshipStatus> occupiedStatuses = List.of(MentorshipStatus.PENDING, MentorshipStatus.ACCEPTED);
 
         // Не допускаем несколько ожидающих заявок
@@ -288,14 +279,6 @@ public class MentorshipService {
 
             if (!sameMsu(mentor, mentee)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Наставник и наставляемый должны относиться к одному МСУ.");
-            }
-
-            var compatibility = compatibilityCalculator.calculate(mentor.getId(), mentee.getId());
-            BigDecimal compatibilityPercentage = compatibility.compatibilityPercentage();
-
-            if (compatibilityPercentage == null || compatibilityPercentage.compareTo(BigDecimal.valueOf(50)) <= 0) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT,
-                        "Совместимость наставника и наставляемого должна быть выше 50%. Предложение больше нельзя принять.");
             }
 
             // После получения блокировки проверяем актуальное состояние.
@@ -681,6 +664,55 @@ public class MentorshipService {
                             log.getSource(),
                             log.getCreatedAt());
                 })
+                .toList();
+    }
+
+    /**
+     * Возвращает доступных наставников МСУ
+     * для ручного назначения наставляемому.
+     */
+    public List<AvailableMentorResponse> getAvailableMentors(Long menteeId) {
+        User admin = getCurrentUser();
+
+        requireRole(admin, RoleCode.OO_ADMIN);
+        requireActiveAccount(admin);
+
+        if (admin.getEducationalOrganization() == null || admin.getMsu() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "У администратора не настроена организационная принадлежность.");
+        }
+
+        User mentee = userRepository.findById(menteeId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Наставляемый не найден."));
+
+        requireRole(mentee, RoleCode.MENTEE);
+        requireActiveAccount(mentee);
+        requireAllowedMenteeAge(mentee);
+
+        if (!sameOrganization(admin, mentee)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Наставляемый не относится к вашей образовательной организации.");
+        }
+
+        LocalDate today = LocalDate.now(clock);
+
+        AcademicYear academicYear = academicYearRepository.findByDate(today)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "На текущую дату не найден действующий учебный год."));
+
+        return userRepository.findEligibleMentors(
+                        RoleCode.MENTOR,
+                        admin.getMsu().getId(),
+                        AccountStatus.ACCEPTED,
+                        MentorshipStatus.ACCEPTED,
+                        academicYear.getId())
+                .stream()
+                .map(mentor -> new AvailableMentorResponse(
+                        mentor.getId(),
+                        mentor.getFirstName(),
+                        mentor.getLastName(),
+                        mentor.getMiddleName(),
+                        mentor.getEducationalOrganization() != null
+                                ? mentor.getEducationalOrganization().getName()
+                                : null
+                ))
                 .toList();
     }
 
